@@ -10,7 +10,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background-dark text-white font-display relative overflow-hidden">
+    <div className="h-screen w-full bg-background-dark text-white font-display relative overflow-hidden grid-pattern flex flex-col">
       {/* Watermark */}
       <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
         <svg width="600" height="600" viewBox="0 0 48 48" fill="currentColor">
@@ -19,7 +19,7 @@ export default function LoginPage() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 flex justify-between items-center px-10 py-4 border-b border-border-light">
+      <header className="relative z-10 shrink-0 flex justify-between items-center px-10 py-4 border-b border-border-light">
         <div className="flex items-center gap-3">
           <svg className="w-6 h-6 text-primary" viewBox="0 0 48 48" fill="currentColor">
             <path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" />
@@ -32,8 +32,8 @@ export default function LoginPage() {
       </header>
 
       {/* Main */}
-      <main className="relative z-10 flex justify-center items-center min-h-[calc(100vh-200px)]">
-        <div className="w-full max-w-[480px] bg-card-bg/80 backdrop-blur-md border border-border-color rounded-xl shadow-2xl p-8 mx-4">
+      <main className="relative z-10 flex-1 flex justify-center items-center overflow-hidden">
+        <div className="w-full max-w-[480px] bg-card-bg/80 backdrop-blur-md border border-border-color rounded-xl shadow-2xl p-8 mx-4 my-auto">
 
           <h2 className="text-4xl font-bold text-center">
             Secure Mission Control
@@ -115,7 +115,7 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 flex justify-between px-10 py-6 text-text-dim text-xs border-t border-border-light">
+      <footer className="relative z-10 shrink-0 flex justify-between px-10 py-6 text-text-dim text-xs border-t border-border-light">
         <span>© 2024 Global Defense Systems</span>
         <div className="flex gap-6">
           <a href="#" className="hover:text-text-secondary transition">Security Policy</a>
