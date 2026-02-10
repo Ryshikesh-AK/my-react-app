@@ -1,13 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const DEFAULT_OPERATOR_ID = "Admin";
+const DEFAULT_PASSWORD = "1234";
+
 export default function LoginPage() {
   const [operatorId, setOperatorId] = useState("");
   const [password, setPassword] = useState("");
 
+  const navigate = useNavigate();
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log({ operatorId, password });
+
+    if (
+      operatorId === DEFAULT_OPERATOR_ID &&
+      password === DEFAULT_PASSWORD
+    ) {
+      // TEMP authentication flag
+      localStorage.setItem("isAuthenticated", "true");
+
+      // Go to dashboard
+      navigate("/dashboard");
+    } else {
+      alert("Invalid Operator ID or Password");
+    }
   };
 
   return (
@@ -36,12 +53,8 @@ export default function LoginPage() {
       <main className="relative z-10 flex-1 flex justify-center items-center overflow-hidden">
         <div className="w-full max-w-[480px] bg-card-bg/80 backdrop-blur-md border border-border-color rounded-xl shadow-2xl p-8 mx-4 my-auto">
 
-          <h2 className="text-4xl font-bold text-center">
-            Secure Mission Control
-          </h2>
-          <h2 className="text-4xl font-bold text-center mb-3">
-            Login
-          </h2>
+          <h2 className="text-4xl font-bold text-center">Secure Mission Control</h2>
+          <h2 className="text-4xl font-bold text-center mb-3">Login</h2>
           <p className="text-text-secondary text-sm text-center">
             Strategic Surveillance & Monitoring System
           </p>
@@ -91,7 +104,7 @@ export default function LoginPage() {
               <a href="#" className="text-primary hover:underline transition">Forgot ID?</a>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
               className="w-full h-14 bg-primary rounded-lg font-bold shadow-lg shadow-primary/20 hover:bg-blue-700 active:bg-blue-800 transition duration-200"
@@ -123,7 +136,6 @@ export default function LoginPage() {
           <a href="#" className="hover:text-text-secondary transition">Contact Support</a>
         </div>
       </footer>
-
     </div>
   );
 }
