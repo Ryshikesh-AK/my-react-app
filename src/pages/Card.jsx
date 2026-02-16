@@ -8,12 +8,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Communication from './Communication';
-
-const data = [
-  { time: '14:00', bpm: 62 }, { time: '14:05', bpm: 68 }, { time: '14:15', bpm: 82 },
-  { time: '14:20', bpm: 72 }, { time: '14:30', bpm: 64 }, { time: '14:35', bpm: 75 },
-  { time: '14:45', bpm: 95 }, { time: '14:50', bpm: 84 }, { time: '15:00', bpm: 68 },
-];
+import { useEffect,useState} from 'react';
 
 const SidebarItem = ({ icon: Icon, label, active = false, onClick }) => (
   <div 
@@ -59,10 +54,46 @@ const LogEntry = ({ status, time, title, description, accentColor }) => {
 const HealthAnalyticsDetail = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  
+const [data, setBiometricData] = useState([
+  { time: '14:00', bpm: 62 }, { time: '14:05', bpm: 68 }, { time: '14:15', bpm: 82 },
+  { time: '14:20', bpm: 72 }, { time: '14:30', bpm: 64 }, { time: '14:35', bpm: 75 },
+  { time: '14:45', bpm: 95 }, { time: '14:50', bpm: 84 }, { time: '15:00', bpm: 68 },
+]);
+
   
   const { soldier } = location.state || { 
     soldier: { name: "UNKNOWN_UNIT", rank: "N/A", bpm: "--", status: "OFFLINE", spo2: "--" } 
   };
+
+  useEffect(() => {
+    // Interval to simulate a heart rate monitor pulse every 5 seconds
+    const interval = setInterval(() => {
+      const now = new Date();
+      
+      // Format time as HH:mm
+      const currentTime = now.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+
+      // Generate a realistic BPM (between 60 and 100)
+      const randomBPM = Math.floor(Math.random() * (100 - 60 + 1)) + 60;
+
+      const newDataPoint = { time: currentTime, bpm: randomBPM };
+
+      setBiometricData((prevData) => {
+        // Keep only the last 10 readings to prevent the chart from getting too crowded
+        const updatedData = [...prevData, newDataPoint];
+        return updatedData.slice(-10); 
+      });
+
+    }, 1000); // 1000ms = 1 seconds
+
+    return () => clearInterval(interval); // Cleanup to prevent memory leaks
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#101422] text-slate-200 font-sans overflow-hidden">
@@ -115,10 +146,6 @@ const HealthAnalyticsDetail = () => {
             icon={MapPin} 
             label="Location" 
             onClick={() => navigate('/location')} 
-          />
-          <SidebarItem 
-            icon={History} 
-            label="History" 
           />
         </nav>
       </aside>

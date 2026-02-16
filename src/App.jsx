@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import './App.css'
 import LoginPage from './pages/LoginPage'
-import HomePage from './pages/HomePage'
 import Dashboard from './pages/Dashboard'
 import WatchFace from './pages/Watch'
 import HealthAnalytics from './pages/Card'
