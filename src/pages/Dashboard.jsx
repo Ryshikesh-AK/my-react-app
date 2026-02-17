@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import OperativeModal from './OperativeModal';
-import firebaseService from '../Service/FirebaseService';
+// import firebaseService from '../Service/FirebaseService'; // No longer needed directly for fetching
+import { useMission } from '../context/MissionContext';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -12,14 +13,13 @@ const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
   return (
     <div
       onClick={onClick}
-      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${
-        isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
-      }`}
+      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
+        }`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-           <div className={`size-1.5 rounded-full ${isCritical ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-blue-400'}`}></div>
-           <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-300">{soldier.name}</span>
+          <div className={`size-1.5 rounded-full ${isCritical ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-blue-400'}`}></div>
+          <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-300">{soldier.name}</span>
         </div>
         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <span onClick={(e) => { e.stopPropagation(); onEdit(); }} className="material-symbols-outlined text-[14px] hover:text-blue-400">edit</span>
@@ -39,17 +39,19 @@ const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
 /* ---------------- Dashboard ---------------- */
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [squads, setSquads] = useState([]); 
-  const [soldiers, setSoldiers] = useState([]);
-  const [activeSquadId, setActiveSquadId] = useState(null); 
+  const { squads, soldiers, addSquad, updateSquad, deleteSquad, addOperative, deleteOperative } = useMission();
+
+  // const [squads, setSquads] = useState([]);  // handled by context
+  // const [soldiers, setSoldiers] = useState([]); // handled by context
+  const [activeSquadId, setActiveSquadId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    const unsubSquads = firebaseService.subscribeToSquads(setSquads);
-    const unsubSoldiers = firebaseService.subscribeToSoldiers(setSoldiers);
-    return () => { clearInterval(timer); unsubSquads(); unsubSoldiers(); };
+    // const unsubSquads = firebaseService.subscribeToSquads(setSquads);
+    // const unsubSoldiers = firebaseService.subscribeToSoldiers(setSoldiers);
+    return () => { clearInterval(timer); /* unsubSquads(); unsubSoldiers(); */ };
   }, []);
 
   const filteredSoldiers = soldiers.filter(s => s.squadId === activeSquadId);
@@ -60,7 +62,7 @@ export default function Dashboard() {
     const name = prompt("Enter new squad name:");
     if (name && name.trim() !== "") {
       try {
-        await firebaseService.addSquad(name);
+        await addSquad(name);
       } catch (error) {
         console.error("Uplink Failure:", error);
       }
@@ -71,7 +73,7 @@ export default function Dashboard() {
     const newName = prompt("Rename Squad Asset:", currentName);
     if (newName && newName.trim() !== "" && newName !== currentName) {
       try {
-        await firebaseService.updateSquad(id, newName);
+        await updateSquad(id, newName);
       } catch (error) {
         console.error("Update Failure:", error);
       }
@@ -79,9 +81,9 @@ export default function Dashboard() {
   };
 
   const handleDeleteSquad = async (id) => {
-    if(window.confirm("CONFIRM DECOMMISSION: Permanently delete this squad and all associated data?")) {
+    if (window.confirm("CONFIRM DECOMMISSION: Permanently delete this squad and all associated data?")) {
       try {
-        await firebaseService.deleteSquad(id);
+        await deleteSquad(id);
         if (activeSquadId === id) setActiveSquadId(null);
       } catch (error) {
         console.error("Deletion Failure:", error);
@@ -93,12 +95,12 @@ export default function Dashboard() {
   const handleAddAgent = async (formData) => {
     if (!activeSquadId) return alert("Select squad.");
     try {
-      await firebaseService.addOperative(activeSquadId, formData);
+      await addOperative(activeSquadId, formData);
       setIsModalOpen(false);
     } catch (error) { console.error(error); }
   };
 
-  const handleCardClick = (soldier) => navigate('/Card', { state: { soldier } });
+  const handleCardClick = (soldier) => navigate(`/operative/${soldier.id}/vitals`);
 
   return (
     <div className="flex h-screen bg-[#02040a] text-white font-sans overflow-hidden">
@@ -118,11 +120,10 @@ export default function Dashboard() {
               <div
                 key={squad.id}
                 onClick={() => setActiveSquadId(squad.id)}
-                className={`group w-full p-3 rounded flex justify-between items-center cursor-pointer border transition-all ${
-                  activeSquadId === squad.id 
-                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)]' 
+                className={`group w-full p-3 rounded flex justify-between items-center cursor-pointer border transition-all ${activeSquadId === squad.id
+                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)]'
                   : 'bg-transparent border-transparent hover:bg-[#0d1117] hover:border-[#1a2238]'
-                }`}
+                  }`}
               >
                 <div className="flex flex-col">
                   <span className={`text-[10px] font-black uppercase tracking-widest ${activeSquadId === squad.id ? 'text-blue-400' : 'text-[#4a5578]'}`}>
@@ -132,14 +133,14 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span 
-                    onClick={(e) => { e.stopPropagation(); handleEditSquad(squad.id, squad.name); }} 
+                  <span
+                    onClick={(e) => { e.stopPropagation(); handleEditSquad(squad.id, squad.name); }}
                     className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-blue-400"
                   >
                     edit
                   </span>
-                  <span 
-                    onClick={(e) => { e.stopPropagation(); handleDeleteSquad(squad.id); }} 
+                  <span
+                    onClick={(e) => { e.stopPropagation(); handleDeleteSquad(squad.id); }}
                     className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-red-500"
                   >
                     delete
@@ -170,7 +171,7 @@ export default function Dashboard() {
 
       {/* MAIN VIEWPORT */}
       <main className="flex-1 relative flex flex-col overflow-hidden">
-        
+
         {/* WORLD MAP LAYER */}
         <div className="absolute inset-0 z-0 pointer-events-none bg-[#02040a]">
           <ComposableMap projectionConfig={{ scale: 220 }} className="w-full h-full opacity-20">
@@ -189,12 +190,12 @@ export default function Dashboard() {
           <div className="flex flex-col">
             <span className="text-[8px] font-black text-blue-500 tracking-widest uppercase">Target_Sector:</span>
             <span className="text-xs font-bold text-white uppercase tracking-widest">
-                {squads.find(s => s.id === activeSquadId)?.name || "Awaiting Uplink"}
+              {squads.find(s => s.id === activeSquadId)?.name || "Awaiting Uplink"}
             </span>
           </div>
-          <button 
+          <button
             disabled={!activeSquadId}
-            onClick={() => setIsModalOpen(true)} 
+            onClick={() => setIsModalOpen(true)}
             className={`${!activeSquadId ? 'bg-gray-800 cursor-not-allowed opacity-50' : 'bg-blue-600 hover:bg-blue-500'} px-6 py-2 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all`}
           >
             Deploy Unit
@@ -205,12 +206,12 @@ export default function Dashboard() {
         <div className="flex-1 p-8 relative z-10 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredSoldiers.map(s => (
-              <OperativeCard 
-                key={s.id} 
-                soldier={s} 
-                onClick={() => handleCardClick(s)} 
-                onEdit={() => alert('Edit Operative Modal coming soon')} 
-                onDelete={() => firebaseService.deleteOperative(s.id)} 
+              <OperativeCard
+                key={s.id}
+                soldier={s}
+                onClick={() => handleCardClick(s)}
+                onEdit={() => alert('Edit Operative Modal coming soon')}
+                onDelete={() => deleteOperative(s.id)}
               />
             ))}
           </div>
@@ -218,8 +219,8 @@ export default function Dashboard() {
 
         {/* FOOTER */}
         <footer className="h-10 bg-[#050810] border-t border-[#1a2238] flex items-center px-8 text-[9px] font-bold gap-10 relative z-10">
-           <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">TOTAL_UNITS:</span> <span className="text-white font-mono">{filteredSoldiers.length}</span></div>
-           <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">ALERT_COUNT:</span> <span className={criticalCount > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}>{criticalCount}</span></div>
+          <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">TOTAL_UNITS:</span> <span className="text-white font-mono">{filteredSoldiers.length}</span></div>
+          <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">ALERT_COUNT:</span> <span className={criticalCount > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}>{criticalCount}</span></div>
         </footer>
       </main>
 

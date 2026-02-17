@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, Bell, Settings, CircleAlert, 
-  MapPin, Radar, LayoutDashboard, Users, 
-  Phone, Video, Info, Paperclip, Smile, 
+import {
+  Search, Bell, Settings, CircleAlert,
+  MapPin, Radar, LayoutDashboard, Users,
+  Phone, Video, Info, Paperclip, Smile,
   Send, Navigation, Shield, Wifi, Activity, MessageSquare, ChevronLeft,
   X, Crosshair, Maximize2, Droplets, Heart
 } from 'lucide-react';
 
 // --- Sidebar Item Component ---
 const SidebarItem = ({ icon: Icon, label, active = false, onClick, badge }) => (
-  <div 
+  <div
     onClick={onClick}
-    className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-all border-l-4 ${
-    active 
-      ? 'bg-blue-600/10 text-blue-400 border-blue-500' 
+    className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-all border-l-4 ${active
+      ? 'bg-blue-600/10 text-blue-400 border-blue-500'
       : 'text-slate-400 border-transparent hover:text-white hover:bg-slate-800/30'
-  }`}>
+      }`}>
     <div className="flex items-center gap-3">
       <Icon size={18} />
       <span className="text-sm font-bold uppercase tracking-tight">{label}</span>
@@ -25,15 +24,15 @@ const SidebarItem = ({ icon: Icon, label, active = false, onClick, badge }) => (
   </div>
 );
 
-const CommunicationHub = () => {
+const CommunicationHub = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [showLargeMap, setShowLargeMap] = useState(false);
   const [isEmergencyActive] = useState(true); // Control pulse state
 
   return (
-    <div className="flex h-screen bg-[#0d101b] text-slate-200 font-sans overflow-hidden relative">
-      
+    <div className={`flex h-screen bg-[#0d101b] text-slate-200 font-sans overflow-hidden relative ${embedded ? 'h-full' : ''}`}>
+
       {/* 🔴 SATELLITE HUD OVERLAY */}
       {showLargeMap && (
         <div className="absolute inset-0 z-[100] bg-[#0d101b]/98 p-10 flex flex-col animate-in fade-in zoom-in duration-300">
@@ -47,91 +46,92 @@ const CommunicationHub = () => {
             </button>
           </div>
           <div className="flex-1 border border-blue-500/20 rounded-3xl relative overflow-hidden bg-slate-900 shadow-[0_0_100px_rgba(37,99,235,0.1)]">
-             <img src="https://api.placeholder.com/1600/900?text=High+Res+Topography+Sector+7" className="w-full h-full object-cover grayscale opacity-20" />
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                <Crosshair size={40} className="text-blue-500 animate-pulse" />
-                <div className="mt-4 bg-blue-600 text-white px-4 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest">TARGET: BRAVO SQUAD</div>
-             </div>
-             <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(37,99,235,0.05)_50%,transparent_100%)] h-1/4 w-full animate-scan" />
+            <img src="https://api.placeholder.com/1600/900?text=High+Res+Topography+Sector+7" className="w-full h-full object-cover grayscale opacity-20" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+              <Crosshair size={40} className="text-blue-500 animate-pulse" />
+              <div className="mt-4 bg-blue-600 text-white px-4 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest">TARGET: BRAVO SQUAD</div>
+            </div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(37,99,235,0.05)_50%,transparent_100%)] h-1/4 w-full animate-scan" />
           </div>
         </div>
       )}
 
       {/* --- LEFT SIDEBAR --- */}
-      <aside className="w-72 bg-[#101422] border-r border-slate-800 flex flex-col shrink-0">
-        <div className="p-8 flex items-center gap-3 border-b border-slate-800">
-          <div className="bg-blue-600 p-2 rounded shadow-lg shadow-blue-900/40">
-            <Shield size={20} className="text-white" />
+      {!embedded && (
+        <aside className="w-72 bg-[#101422] border-r border-slate-800 flex flex-col shrink-0">
+          <div className="p-8 flex items-center gap-3 border-b border-slate-800">
+            <div className="bg-blue-600 p-2 rounded shadow-lg shadow-blue-900/40">
+              <Shield size={20} className="text-white" />
+            </div>
+            <h1 className="text-md font-black uppercase tracking-tighter text-white">Mission Control</h1>
           </div>
-          <h1 className="text-md font-black uppercase tracking-tighter text-white">Mission Control</h1>
-        </div>
-        <nav className="flex-1 mt-6">
-          <SidebarItem icon={LayoutDashboard} label="Dashboard" onClick={() => navigate('/Dashboard')} />
-          <SidebarItem icon={Activity} label="Vitals" onClick={() => navigate('/Card')} />
-          <SidebarItem icon={MessageSquare} label="Messages" active badge="2" />
-        </nav>
-      </aside>
+          <nav className="flex-1 mt-6">
+            <SidebarItem icon={LayoutDashboard} label="Dashboard" onClick={() => navigate('/Dashboard')} />
+            <SidebarItem icon={Activity} label="Vitals" onClick={() => navigate('/operative-status')} />
+            <SidebarItem icon={MessageSquare} label="Messages" active badge="2" />
+          </nav>
+        </aside>
+      )}
 
       {/* --- CENTER CHAT STREAM --- */}
       <main className="flex-1 flex flex-col bg-[#101422]">
         <header className="h-20 border-b border-slate-800 px-10 flex items-center justify-between bg-[#101422]/80 backdrop-blur-md">
-           <div className="flex items-center gap-6">
-              <div className="w-12 h-12 rounded-xl bg-blue-600/10 border border-blue-600/30 flex items-center justify-center text-blue-500">
-                <Users size={24} />
-              </div>
-              <h3 className="text-xl font-black tracking-tight text-white uppercase">Alpha Team Channel</h3>
-           </div>
-           <div className="flex gap-4">
-              <button className="p-3 bg-slate-800 rounded-lg"><Phone size={18}/></button>
-              <button className="p-3 bg-slate-800 rounded-lg"><Video size={18}/></button>
-              <button className="p-3 bg-slate-800 rounded-lg"><Info size={18}/></button>
-           </div>
+          <div className="flex items-center gap-6">
+            <div className="w-12 h-12 rounded-xl bg-blue-600/10 border border-blue-600/30 flex items-center justify-center text-blue-500">
+              <Users size={24} />
+            </div>
+            <h3 className="text-xl font-black tracking-tight text-white uppercase">Alpha Team Channel</h3>
+          </div>
+          <div className="flex gap-4">
+            <button className="p-3 bg-slate-800 rounded-lg"><Phone size={18} /></button>
+            <button className="p-3 bg-slate-800 rounded-lg"><Video size={18} /></button>
+            <button className="p-3 bg-slate-800 rounded-lg"><Info size={18} /></button>
+          </div>
         </header>
 
         {isEmergencyActive && (
           <div className="bg-rose-600/10 border-b border-rose-600/30 px-10 py-4 flex justify-between items-center">
-             <div className="flex items-center gap-4">
-               <CircleAlert className="text-rose-600 animate-pulse" size={24} />
-               <p className="text-xs font-black text-white uppercase tracking-tight">SOS ALERT: SQUAD BRAVO // SECTOR 7</p>
-             </div>
-             <button className="bg-rose-600 text-white px-6 py-2 rounded font-black text-[10px] uppercase transition-all">Dispatch Medic</button>
+            <div className="flex items-center gap-4">
+              <CircleAlert className="text-rose-600 animate-pulse" size={24} />
+              <p className="text-xs font-black text-white uppercase tracking-tight">SOS ALERT: SQUAD BRAVO // SECTOR 7</p>
+            </div>
+            <button className="bg-rose-600 text-white px-6 py-2 rounded font-black text-[10px] uppercase transition-all">Dispatch Medic</button>
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-           <div className="flex gap-4">
-              <div className="size-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black">S-01</div>
-              <div className="bg-[#1a2036] border border-slate-800 p-4 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[70%] shadow-lg">
-                Proceeding to extraction point Delta. Alpha squad currently in high cover. No hostiles detected.
-              </div>
-           </div>
+          <div className="flex gap-4">
+            <div className="size-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black">S-01</div>
+            <div className="bg-[#1a2036] border border-slate-800 p-4 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[70%] shadow-lg">
+              Proceeding to extraction point Delta. Alpha squad currently in high cover. No hostiles detected.
+            </div>
+          </div>
         </div>
 
         <footer className="p-8 border-t border-slate-800 bg-[#0d101b]">
-           <div className="max-w-4xl mx-auto flex gap-4">
-              <input className="flex-1 bg-[#1b2136] border border-slate-800 rounded-2xl py-5 px-8 text-sm outline-none focus:border-blue-500 transition-colors" placeholder="Enter tactical command..." />
-              <button className="bg-blue-600 w-16 rounded-2xl flex items-center justify-center hover:bg-blue-500 transition-all"><Send size={24} className="text-white"/></button>
-           </div>
+          <div className="max-w-4xl mx-auto flex gap-4">
+            <input className="flex-1 bg-[#1b2136] border border-slate-800 rounded-2xl py-5 px-8 text-sm outline-none focus:border-blue-500 transition-colors" placeholder="Enter tactical command..." />
+            <button className="bg-blue-600 w-16 rounded-2xl flex items-center justify-center hover:bg-blue-500 transition-all"><Send size={24} className="text-white" /></button>
+          </div>
         </footer>
       </main>
 
       {/* --- RIGHT INFO PANEL --- */}
       <aside className="w-80 border-l border-slate-800 bg-[#101422] p-4 hidden xl:flex flex-col gap-6">
-        
+
         {/* Unit Location Card with Pulse Animation */}
         <section>
           <h4 className="text-[10px] font-black text-[#919fca] uppercase tracking-[0.2em] mb-3">Unit Location</h4>
-          <div 
+          <div
             onClick={() => setShowLargeMap(true)}
-            className={`h-40 w-full rounded-lg bg-[#1b2136] border relative overflow-hidden group cursor-pointer transition-all duration-500 ${
-              isEmergencyActive 
-              ? 'border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.2)] animate-pulse-tactical' 
+            className={`h-40 w-full rounded-lg bg-[#1b2136] border relative overflow-hidden group cursor-pointer transition-all duration-500 ${isEmergencyActive
+              ? 'border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.2)] animate-pulse-tactical'
               : 'border-[#323f67]'
-            }`}
+              }`}
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#0f47f0]/20 to-transparent" />
             <img className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" src="https://api.placeholder.com/400/300?text=Satelitte+Map" alt="Map" />
-            
+
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isEmergencyActive ? 'text-rose-500' : 'text-[#0f47f0]'} animate-pulse`}>
               <Navigation fill="currentColor" size={24} />
             </div>
@@ -176,7 +176,8 @@ const CommunicationHub = () => {
         </div>
       </aside>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes scan { from { top: -20%; } to { top: 120%; } }
         @keyframes pulse-tactical {
           0% { border-color: rgba(225, 29, 72, 0.3); }
