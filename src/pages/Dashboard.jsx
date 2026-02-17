@@ -1,75 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import OperativeModal from './OperativeModal';
 import firebaseService from '../Service/FirebaseService';
 
-/* ---------------- Top Stat Card ---------------- */
-const TopStatCard = ({ label, value, icon, colorClass, statusIcon }) => (
-  <div className="flex-1 min-w-[200px] bg-[#1a2036] border border-[#2d385e] rounded-xl p-5">
-    <p className="text-[#919fca] text-xs font-bold uppercase tracking-wider">{label}</p>
-    <div className="flex items-end justify-between mt-2">
-      <h3 className={`text-3xl font-bold tracking-tight ${colorClass || 'text-white'}`}>
-        {value}
-      </h3>
-      <span className={`material-symbols-outlined ${statusIcon ? 'text-tactical-green' : 'text-[#3b4b7a]'}`}>
-        {icon}
-      </span>
-    </div>
-  </div>
-);
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 /* ---------------- Operative Card ---------------- */
 const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
   const isCritical = soldier.status === 'CRITICAL';
-  const isCaution = soldier.status === 'CAUTION';
-
   return (
     <div
       onClick={onClick}
-      className={`bg-[#1a2036] rounded-xl border transition-all duration-300 overflow-hidden flex flex-col cursor-pointer hover:scale-[1.02] ${
-        isCritical ? 'border-tactical-red ring-1 ring-tactical-red animate-pulse' : 'border-[#2d385e]'
+      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${
+        isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
       }`}
     >
-      <div className="p-3 flex items-center justify-between bg-[#232c48]/30">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-full border-2 border-[#3b4b7a] bg-slate-800 overflow-hidden">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${soldier.name}`} alt="profile" />
-          </div>
-          <div>
-            <h4 className="text-white text-sm font-bold uppercase">{soldier.name}</h4>
-            <p className="text-[#919fca] text-[10px] uppercase">{soldier.rank}</p>
-          </div>
-        </div>
-
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="material-symbols-outlined text-sm cursor-pointer hover:text-blue-400"
-          >
-            edit
-          </span>
-          <span
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="material-symbols-outlined text-sm cursor-pointer hover:text-red-500"
-          >
-            delete
-          </span>
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-            isCritical
-              ? 'bg-tactical-red text-white border-tactical-red'
-              : isCaution
-              ? 'bg-tactical-yellow/20 text-tactical-yellow border-tactical-yellow/30'
-              : 'bg-tactical-green/20 text-tactical-green border-tactical-green/30'
-          }`}>
-            {soldier.status}
-          </span>
+           <div className={`size-1.5 rounded-full ${isCritical ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-blue-400'}`}></div>
+           <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-300">{soldier.name}</span>
+        </div>
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span onClick={(e) => { e.stopPropagation(); onEdit(); }} className="material-symbols-outlined text-[14px] hover:text-blue-400">edit</span>
+          <span onClick={(e) => { e.stopPropagation(); onDelete(); }} className="material-symbols-outlined text-[14px] hover:text-red-500">delete</span>
         </div>
       </div>
-
-      <div className="p-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-white">{soldier.bpm}</span>
-          <span className="text-[#919fca] text-xs uppercase">BPM</span>
+      <div className="flex justify-between items-end">
+        <div>
+          <p className="text-[8px] text-[#4a5578] uppercase font-black">{soldier.rank}</p>
+          <p className="text-xl font-mono font-bold text-white leading-none">{soldier.bpm}<span className="text-[9px] ml-1 text-blue-500 font-normal">BPM</span></p>
         </div>
       </div>
     </div>
@@ -79,192 +39,191 @@ const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
 /* ---------------- Dashboard ---------------- */
 export default function Dashboard() {
   const navigate = useNavigate();
-
-  const [squads, setSquads] = useState([
-    { id: 1, name: "Squad Alpha", status: "ACTIVE" }
-  ]);
-
-    const [soldiers, setSoldiers] = useState([]);
+  const [squads, setSquads] = useState([]); 
+  const [soldiers, setSoldiers] = useState([]);
+  const [activeSquadId, setActiveSquadId] = useState(null); 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    // 1. Start the subscription via the service
-    const unsubscribe = firebaseService.subscribeToSoldiers((data) => {
-      // 2. Update the local state with the data from Firebase
-      setSoldiers(data);
-      console.log("Tactical Data Synced: Units online.");
-    });
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const unsubSquads = firebaseService.subscribeToSquads(setSquads);
+    const unsubSoldiers = firebaseService.subscribeToSoldiers(setSoldiers);
+    return () => { clearInterval(timer); unsubSquads(); unsubSoldiers(); };
+  }, []);
 
-    // 3. Cleanup: Stop listening when the component unmounts
-    return () => unsubscribe();
-  }, []); // Empty dependency array ensures this runs once on mount
+  const filteredSoldiers = soldiers.filter(s => s.squadId === activeSquadId);
+  const criticalCount = filteredSoldiers.filter(s => s.status === 'CRITICAL').length;
 
-  /* -------- Squad Functions -------- */
-  const handleAddSquad = () => {
+  /* -------- SQUAD CRUD FUNCTIONS -------- */
+  const handleAddSquad = async () => {
     const name = prompt("Enter new squad name:");
-    if (!name) return;
-
-    setSquads([...squads, {
-      id: Date.now(),
-      name,
-      status: "ACTIVE"
-    }]);
+    if (name && name.trim() !== "") {
+      try {
+        await firebaseService.addSquad(name);
+      } catch (error) {
+        console.error("Uplink Failure:", error);
+      }
+    }
   };
 
-  const handleEditSquad = (id) => {
-    const newName = prompt("Enter new squad name:");
-    if (!newName) return;
-
-    setSquads(squads.map(s =>
-      s.id === id ? { ...s, name: newName } : s
-    ));
+  const handleEditSquad = async (id, currentName) => {
+    const newName = prompt("Rename Squad Asset:", currentName);
+    if (newName && newName.trim() !== "" && newName !== currentName) {
+      try {
+        await firebaseService.updateSquad(id, newName);
+      } catch (error) {
+        console.error("Update Failure:", error);
+      }
+    }
   };
 
-  const handleDeleteSquad = (id) => {
-    setSquads(squads.filter(s => s.id !== id));
+  const handleDeleteSquad = async (id) => {
+    if(window.confirm("CONFIRM DECOMMISSION: Permanently delete this squad and all associated data?")) {
+      try {
+        await firebaseService.deleteSquad(id);
+        if (activeSquadId === id) setActiveSquadId(null);
+      } catch (error) {
+        console.error("Deletion Failure:", error);
+      }
+    }
   };
 
-  /* -------- Member Functions -------- */
+  /* -------- OPERATIVE FUNCTIONS -------- */
   const handleAddAgent = async (formData) => {
-  try {
-    // 1. Await the Firebase service call first
-    // This ensures data is sent to the cloud before we update the local UI
-    const savedAgent = await firebaseService.addOperative(1, formData);
-
-    // 2. Prepare the new agent for the local state
-    // We use the ID returned from Firebase (savedAgent.id) instead of Date.now()
-    const newAgent = {
-      id: savedAgent.id || Date.now(),
-      name: formData.callsign || "UNNAMED_UNIT",
-      rank: formData.rank || "OPERATIVE",
-      status: "STABLE",
-      bpm: parseInt(formData.restingHeartRate) || 72,
-      squadId: 1
-    };
-
-    // 3. Update local state and close the UI
-    setSoldiers(prevSoldiers => [...prevSoldiers, newAgent]);
-    setIsModalOpen(false);
-
-    console.log("Tactical Uplink Success: Operative deployed to SSTracker.");
-  } catch (error) {
-    // 4. Handle any connection or permission errors
-    console.error("Tactical Uplink Failed:", error);
-    alert("System Error: Failed to sync operative with Firebase.");
-  }
-};  
-
-  const handleEditMember = (id) => {
-    const newName = prompt("Enter new member name:");
-    if (!newName) return;
-
-    setSoldiers(soldiers.map(s =>
-      s.id === id ? { ...s, name: newName } : s
-    ));
+    if (!activeSquadId) return alert("Select squad.");
+    try {
+      await firebaseService.addOperative(activeSquadId, formData);
+      setIsModalOpen(false);
+    } catch (error) { console.error(error); }
   };
 
-  const handleDeleteMember = (id) => {
-    setSoldiers(soldiers.filter(s => s.id !== id));
-  };
-
-  const handleCardClick = (soldier) => {
-    navigate('/Card', { state: { soldier } });
-  };
+  const handleCardClick = (soldier) => navigate('/Card', { state: { soldier } });
 
   return (
-    <div className="flex h-screen bg-[#101422] text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#02040a] text-white font-sans overflow-hidden">
 
-      {/* Sidebar */}
-      <aside className="w-72 bg-[#101422] border-r border-[#232c48] p-6 flex flex-col">
-        <div className="mb-6">
-          <p className="text-[#919fca] text-[10px] font-bold uppercase tracking-widest">
-            Active Mission
-          </p>
-          <h1 className="text-xl font-black mt-1 uppercase text-blue-500">
-            Operation Nightfall
+      {/* SIDEBAR */}
+      <aside className="w-72 bg-[#050810] border-r border-[#1a2238] flex flex-col relative z-20 shadow-2xl">
+        <div className="p-6 border-b border-[#1a2238] bg-[#080b14]">
+          <h1 className="text-sm font-black tracking-[0.3em] text-blue-500 flex items-center gap-2">
+            <span className="material-symbols-outlined text-sm">radar</span> COMMAND CENTER
           </h1>
         </div>
 
-        <nav className="space-y-2 flex-1">
-          {squads.map((squad) => (
-            <div
-              key={squad.id}
-              className="w-full bg-[#0f47f0]/10 border border-[#0f47f0]/30 p-3 rounded-lg flex justify-between items-center"
-            >
-              <span className="flex items-center gap-2 text-sm font-bold">
-                <span className="material-symbols-outlined text-primary">groups</span>
-                {squad.name}
-              </span>
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+          {squads.map((squad) => {
+            const count = soldiers.filter(s => s.squadId === squad.id).length;
+            return (
+              <div
+                key={squad.id}
+                onClick={() => setActiveSquadId(squad.id)}
+                className={`group w-full p-3 rounded flex justify-between items-center cursor-pointer border transition-all ${
+                  activeSquadId === squad.id 
+                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)]' 
+                  : 'bg-transparent border-transparent hover:bg-[#0d1117] hover:border-[#1a2238]'
+                }`}
+              >
+                <div className="flex flex-col">
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${activeSquadId === squad.id ? 'text-blue-400' : 'text-[#4a5578]'}`}>
+                    {squad.name}
+                  </span>
+                  <span className="text-[8px] text-[#4a5578] font-bold">{count} UNITS ACTIVE</span>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <span
-                  onClick={() => handleEditSquad(squad.id)}
-                  className="material-symbols-outlined text-xs cursor-pointer hover:text-blue-400"
-                >
-                  edit
-                </span>
-                <span
-                  onClick={() => handleDeleteSquad(squad.id)}
-                  className="material-symbols-outlined text-xs cursor-pointer hover:text-red-500"
-                >
-                  delete
-                </span>
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span 
+                    onClick={(e) => { e.stopPropagation(); handleEditSquad(squad.id, squad.name); }} 
+                    className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-blue-400"
+                  >
+                    edit
+                  </span>
+                  <span 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteSquad(squad.id); }} 
+                    className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-red-500"
+                  >
+                    delete
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* Add Squad Button */}
           <button
             onClick={handleAddSquad}
-            className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-[#3b4b7a] p-3 rounded-lg text-sm font-bold text-[#919fca] hover:border-[#0f47f0] hover:text-white transition-all"
+            className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-[#1a2238] p-3 rounded text-[9px] font-black uppercase text-[#4a5578] hover:border-blue-500 hover:text-white transition-all mt-4"
           >
-            <span className="material-symbols-outlined">add</span>
-            Add Squad
+            <span className="material-symbols-outlined text-sm">add</span> Initialize New Squad
           </button>
         </nav>
+
+        <div className="p-6 border-t border-[#1a2238] bg-[#02040a]">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="size-1.5 bg-red-600 rounded-full animate-ping"></div>
+            <span className="text-[9px] font-black text-red-500 tracking-widest">LIVE_SIGNAL</span>
+          </div>
+          <p className="text-2xl font-mono font-light text-white leading-tight">
+            {currentTime.toLocaleTimeString([], { hour12: false })}
+          </p>
+        </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      {/* MAIN VIEWPORT */}
+      <main className="flex-1 relative flex flex-col overflow-hidden">
+        
+        {/* WORLD MAP LAYER */}
+        <div className="absolute inset-0 z-0 pointer-events-none bg-[#02040a]">
+          <ComposableMap projectionConfig={{ scale: 220 }} className="w-full h-full opacity-20">
+            <Geographies geography={geoUrl}>
+              {({ geographies }) =>
+                geographies.map((geo) => (
+                  <Geography key={geo.rsmKey} geography={geo} fill="#1e293b" stroke="#334155" strokeWidth={0.5} style={{ default: { outline: "none" } }} />
+                ))
+              }
+            </Geographies>
+          </ComposableMap>
+        </div>
 
-        <header className="h-16 border-b border-[#232c48] flex items-center justify-between px-8">
-          <h2 className="text-sm font-black uppercase">Squad Safety Control</h2>
-
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#0f47f0] px-4 py-2 rounded-lg text-[11px] font-black uppercase flex items-center gap-2"
+        {/* HEADER */}
+        <header className="h-16 border-b border-[#1a2238] flex items-center justify-between px-8 relative z-10 bg-[#02040a]/40 backdrop-blur-md">
+          <div className="flex flex-col">
+            <span className="text-[8px] font-black text-blue-500 tracking-widest uppercase">Target_Sector:</span>
+            <span className="text-xs font-bold text-white uppercase tracking-widest">
+                {squads.find(s => s.id === activeSquadId)?.name || "Awaiting Uplink"}
+            </span>
+          </div>
+          <button 
+            disabled={!activeSquadId}
+            onClick={() => setIsModalOpen(true)} 
+            className={`${!activeSquadId ? 'bg-gray-800 cursor-not-allowed opacity-50' : 'bg-blue-600 hover:bg-blue-500'} px-6 py-2 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all`}
           >
-            <span className="material-symbols-outlined">person_add</span>
-            Enroll Operative
+            Deploy Unit
           </button>
         </header>
 
-        <div className="p-8 space-y-8">
-          <div className="flex gap-6">
-            <TopStatCard label="Active Members" value={soldiers.length} icon="groups" />
-            <TopStatCard label="Critical Alerts" value="00" icon="error" colorClass="text-red-500" />
-            <TopStatCard label="Squad Avg BPM" value={soldiers.length ? 72 : "--"} icon="monitor_heart" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {soldiers.map(s => (
-              <OperativeCard
-                key={s.id}
-                soldier={s}
-                onClick={() => handleCardClick(s)}
-                onEdit={() => handleEditMember(s.id)}
-                onDelete={() => handleDeleteMember(s.id)}
+        {/* OPERATIVES GRID */}
+        <div className="flex-1 p-8 relative z-10 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filteredSoldiers.map(s => (
+              <OperativeCard 
+                key={s.id} 
+                soldier={s} 
+                onClick={() => handleCardClick(s)} 
+                onEdit={() => alert('Edit Operative Modal coming soon')} 
+                onDelete={() => firebaseService.deleteOperative(s.id)} 
               />
             ))}
           </div>
         </div>
+
+        {/* FOOTER */}
+        <footer className="h-10 bg-[#050810] border-t border-[#1a2238] flex items-center px-8 text-[9px] font-bold gap-10 relative z-10">
+           <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">TOTAL_UNITS:</span> <span className="text-white font-mono">{filteredSoldiers.length}</span></div>
+           <div className="flex items-center gap-2"><span className="text-blue-500 tracking-tighter">ALERT_COUNT:</span> <span className={criticalCount > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}>{criticalCount}</span></div>
+        </footer>
       </main>
 
-      <OperativeModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAddAgent={handleAddAgent}
-      />
+      <OperativeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAddAgent={handleAddAgent} />
     </div>
   );
 }

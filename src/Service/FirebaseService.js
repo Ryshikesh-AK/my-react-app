@@ -5,17 +5,69 @@ import {
   onSnapshot, 
   query, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,           // Added for referencing specific documents
+  updateDoc,    // Added for editing
+  deleteDoc     // Added for deleting
 } from 'firebase/firestore';
 
 class FirebaseService {
-  // 1. STORE: Add a new operative
+  /* ---------------- SQUAD ACTIONS ---------------- */
+
+  async addSquad(squadName) {
+    try {
+      return await addDoc(collection(db, "squads"), {
+        name: squadName,
+        status: "ACTIVE",
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Firebase Service Error (Add Squad):", error);
+      throw error;
+    }
+  }
+
+  // NEW: Update Squad Name
+  async updateSquad(squadId, newName) {
+    try {
+      const squadRef = doc(db, "squads", squadId);
+      await updateDoc(squadRef, { name: newName });
+    } catch (error) {
+      console.error("Firebase Service Error (Update Squad):", error);
+      throw error;
+    }
+  }
+
+  // NEW: Delete Squad
+  async deleteSquad(squadId) {
+    try {
+      const squadRef = doc(db, "squads", squadId);
+      await deleteDoc(squadRef);
+    } catch (error) {
+      console.error("Firebase Service Error (Delete Squad):", error);
+      throw error;
+    }
+  }
+
+  subscribeToSquads(callback) {
+    const q = query(collection(db, "squads"), orderBy("createdAt", "asc"));
+    return onSnapshot(q, (snapshot) => {
+      const squads = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      callback(squads);
+    });
+  }
+
+  /* ---------------- OPERATIVE ACTIONS ---------------- */
+
   async addOperative(squadId, formData) {
     try {
       return await addDoc(collection(db, "soldiers"), {
-        name: formData.callsign,
-        rank: formData.rank,
-        bpm: parseInt(formData.restingHeartRate),
+        name: formData.callsign || "UNNAMED",
+        rank: formData.rank || "OPERATIVE",
+        bpm: parseInt(formData.restingHeartRate) || 72,
         squadId: squadId,
         status: "STABLE",
         createdAt: serverTimestamp(),
@@ -26,11 +78,30 @@ class FirebaseService {
     }
   }
 
-  // 2. RETRIEVE & NOTIFY: Listen for real-time updates
+  // NEW: Update Operative Data
+  async updateOperative(operativeId, updateData) {
+    try {
+      const operativeRef = doc(db, "soldiers", operativeId);
+      await updateDoc(operativeRef, updateData);
+    } catch (error) {
+      console.error("Firebase Service Error (Update Operative):", error);
+      throw error;
+    }
+  }
+
+  // NEW: Delete Operative
+  async deleteOperative(operativeId) {
+    try {
+      const operativeRef = doc(db, "soldiers", operativeId);
+      await deleteDoc(operativeRef);
+    } catch (error) {
+      console.error("Firebase Service Error (Delete Operative):", error);
+      throw error;
+    }
+  }
+
   subscribeToSoldiers(callback) {
     const q = query(collection(db, "soldiers"), orderBy("createdAt", "desc"));
-    
-    // This is the "Get Notified" part
     return onSnapshot(q, (snapshot) => {
       const soldiers = snapshot.docs.map(doc => ({
         id: doc.id,
