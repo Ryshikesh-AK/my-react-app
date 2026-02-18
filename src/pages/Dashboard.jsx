@@ -1,57 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
-import OperativeModal from './OperativeModal';
-// import firebaseService from '../Service/FirebaseService'; // No longer needed directly for fetching
+import OperativeModal from '../components/OperativeModal';
+// import firebaseService from '../services/FirebaseService'; // No longer needed directly for fetching
 import { useMission } from '../context/MissionContext';
+import OperativeCard from '../components/OperativeCard';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-/* ---------------- Operative Card ---------------- */
-const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
-  const isCritical = soldier.status === 'CRITICAL';
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
-        }`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`size-1.5 rounded-full ${isCritical ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-blue-400'}`}></div>
-          <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-300">{soldier.name}</span>
-        </div>
-        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <span onClick={(e) => { e.stopPropagation(); onEdit(); }} className="material-symbols-outlined text-[14px] hover:text-blue-400">edit</span>
-          <span onClick={(e) => { e.stopPropagation(); onDelete(); }} className="material-symbols-outlined text-[14px] hover:text-red-500">delete</span>
-        </div>
-      </div>
-      <div className="flex justify-between items-end">
-        <div>
-          <p className="text-[8px] text-[#4a5578] uppercase font-black">{soldier.rank}</p>
-          <p className="text-xl font-mono font-bold text-white leading-none">{soldier.bpm}<span className="text-[9px] ml-1 text-blue-500 font-normal">BPM</span></p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /* ---------------- Dashboard ---------------- */
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { squads, soldiers, addSquad, updateSquad, deleteSquad, addOperative, deleteOperative } = useMission();
+  const {
+    squads, soldiers,
+    activeSquadId, setActiveSquadId, // Use from context
+    addSquad, updateSquad, deleteSquad, addOperative, deleteOperative
+  } = useMission();
 
-  // const [squads, setSquads] = useState([]);  // handled by context
-  // const [soldiers, setSoldiers] = useState([]); // handled by context
-  const [activeSquadId, setActiveSquadId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Default Squad Selection
+  useEffect(() => {
+    if (squads.length > 0 && !activeSquadId) {
+      setActiveSquadId(squads[0].id);
+    }
+  }, [squads, activeSquadId, setActiveSquadId]);
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    // const unsubSquads = firebaseService.subscribeToSquads(setSquads);
-    // const unsubSoldiers = firebaseService.subscribeToSoldiers(setSoldiers);
-    return () => { clearInterval(timer); /* unsubSquads(); unsubSoldiers(); */ };
+    return () => clearInterval(timer);
   }, []);
 
   const filteredSoldiers = soldiers.filter(s => s.squadId === activeSquadId);

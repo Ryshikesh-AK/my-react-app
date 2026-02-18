@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import firebaseService from '../Service/FirebaseService';
+import firebaseService from '../services/FirebaseService';
 
 const MissionContext = createContext();
 
@@ -9,6 +9,7 @@ export const MissionProvider = ({ children }) => {
     const [squads, setSquads] = useState([]);
     const [soldiers, setSoldiers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activeSquadId, setActiveSquadId] = useState(null);
 
     useEffect(() => {
         const unsubSquads = firebaseService.subscribeToSquads(setSquads);
@@ -25,6 +26,8 @@ export const MissionProvider = ({ children }) => {
         squads,
         soldiers,
         loading,
+        activeSquadId,      // Exposed state
+        setActiveSquadId,   // Exposed setter
         getSoldierById,
         // Re-expose service methods if needed, or just import service directly in components
         addSquad: firebaseService.addSquad,
