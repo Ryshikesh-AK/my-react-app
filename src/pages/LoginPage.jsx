@@ -1,30 +1,49 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import FirebaseService from "../services/FirebaseService"; // Ensure this matches your project structure
 
 const DEFAULT_OPERATOR_ID = "Admin";
 const DEFAULT_PASSWORD = "1234";
 
 export default function LoginPage() {
+  // Separate states to manage logic without breaking design
+  const [isSoldierMode, setIsSoldierMode] = useState(true); 
   const [operatorId, setOperatorId] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    if (
-      operatorId === DEFAULT_OPERATOR_ID &&
-      password === DEFAULT_PASSWORD
-    ) {
-      // TEMP authentication flag
-      localStorage.setItem("isAuthenticated", "true");
-
-      // Go to dashboard
-      navigate("/dashboard");
+    if (isSoldierMode) {
+      // --- SOLDIER LOGIN: SERVICE ID ONLY ---
+      try {
+        const soldier = await FirebaseService.verifySoldierId(operatorId);
+        if (soldier) {
+          localStorage.setItem("isAuthenticated", "true");
+          localStorage.setItem("userRole", "soldier");
+          localStorage.setItem("activeSoldierId", soldier.id);
+          navigate(`/Watch/${soldier.id}`);
+        } else {
+          alert("Invalid Service ID. Access Denied.");
+        }
+      } catch (error) {
+        alert("Uplink Error: Connection failed.");
+      }
     } else {
-      alert("Invalid Operator ID or Password");
+      // --- ADMIN LOGIN: ID + PASSWORD ---
+      if (operatorId === DEFAULT_OPERATOR_ID && password === DEFAULT_PASSWORD) {
+        localStorage.setItem("isAuthenticated", "true");
+        localStorage.setItem("userRole", "admin");
+        navigate("/dashboard");
+      } else {
+        alert("Invalid Admin Credentials");
+      }
     }
+    setIsLoading(false);
   };
 
   return (
@@ -44,8 +63,17 @@ export default function LoginPage() {
           </svg>
           <h1 className="text-lg font-bold">Mission Control</h1>
         </div>
-        <button className="bg-primary px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition">
-          System Status: Active
+        
+        {/* UPDATED: Toggle button replaces the static "Active" button */}
+        <button 
+          onClick={() => {
+            setIsSoldierMode(!isSoldierMode);
+            setOperatorId(""); // Reset inputs on toggle
+            setPassword("");
+          }}
+          className="bg-primary px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition uppercase tracking-wider"
+        >
+          {isSoldierMode ? "Admin Login" : "Soldier Login"}
         </button>
       </header>
 
@@ -53,63 +81,70 @@ export default function LoginPage() {
       <main className="relative z-10 flex-1 flex justify-center items-center overflow-hidden">
         <div className="w-full max-w-[480px] bg-card-bg/80 backdrop-blur-md border border-border-color rounded-xl shadow-2xl p-8 mx-4 my-auto">
 
-          <h2 className="text-4xl font-bold text-center">Secure Mission Control</h2>
+          <h2 className="text-4xl font-bold text-center">
+            {isSoldierMode ? "Operative Uplink" : "Secure Mission Control"}
+          </h2>
           <h2 className="text-4xl font-bold text-center mb-3">Login</h2>
-          <p className="text-text-secondary text-sm text-center">
-            Strategic Surveillance & Monitoring System
+          <p className="text-text-secondary text-sm text-center uppercase tracking-widest">
+            {isSoldierMode ? "Classified Service ID Required" : "Strategic Surveillance & Monitoring"}
           </p>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
 
-            {/* Operator ID */}
+            {/* Operator ID / Service ID Input */}
             <div>
-              <label className="text-sm font-medium block mb-2">Operator ID</label>
+              <label className="text-sm font-medium block mb-2">
+                {isSoldierMode ? "Service ID" : "Operator ID"}
+              </label>
               <div className="flex">
                 <input
+                  required
                   value={operatorId}
                   onChange={(e) => setOperatorId(e.target.value)}
-                  placeholder="Enter alphanumeric ID"
+                  placeholder={isSoldierMode ? "Enter Service ID (e.g. AL-01)" : "Enter alphanumeric ID"}
                   className="flex-1 h-14 bg-input-bg border border-border-color rounded-l-lg px-4 text-white placeholder-text-secondary focus:ring-1 focus:ring-primary outline-none transition"
                 />
                 <div className="flex items-center px-4 bg-input-bg border border-l-0 border-border-color rounded-r-lg text-text-secondary">
-                  <span className="material-symbols-outlined">badge</span>
+                  <span className="material-symbols-outlined">{isSoldierMode ? "person_pin" : "badge"}</span>
                 </div>
               </div>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="text-sm font-medium block mb-2">Secure Password</label>
-              <div className="flex">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="flex-1 h-14 bg-input-bg border border-border-color rounded-l-lg px-4 text-white placeholder-text-secondary focus:ring-1 focus:ring-primary outline-none transition"
-                />
-                <div className="flex items-center px-4 bg-input-bg border border-l-0 border-border-color rounded-r-lg text-text-secondary">
-                  <span className="material-symbols-outlined">lock</span>
+            {/* Password Field - HIDDEN during Soldier Login */}
+            {!isSoldierMode && (
+              <div>
+                <label className="text-sm font-medium block mb-2">Secure Password</label>
+                <div className="flex">
+                  <input
+                    required
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="flex-1 h-14 bg-input-bg border border-border-color rounded-l-lg px-4 text-white placeholder-text-secondary focus:ring-1 focus:ring-primary outline-none transition"
+                  />
+                  <div className="flex items-center px-4 bg-input-bg border border-l-0 border-border-color rounded-r-lg text-text-secondary">
+                    <span className="material-symbols-outlined">lock</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Biometric + Forgot */}
+            {/* Biometric Link - Logic remains UI only */}
             <div className="flex justify-between items-center text-sm">
               <button type="button" className="flex items-center gap-2 text-text-secondary hover:text-white transition">
                 <span className="material-symbols-outlined text-base">fingerprint</span>
                 Biometric Verification
               </button>
-              <a href="#" className="text-primary hover:underline transition">Forgot ID?</a>
             </div>
 
             {/* Submit */}
             <button
               type="submit"
-              className="w-full h-14 bg-primary rounded-lg font-bold shadow-lg shadow-primary/20 hover:bg-blue-700 active:bg-blue-800 transition duration-200"
+              disabled={isLoading}
+              className="w-full h-14 bg-primary rounded-lg font-bold shadow-lg shadow-primary/20 hover:bg-blue-700 active:bg-blue-800 transition duration-200 uppercase tracking-widest"
             >
-              Secure Login
+              {isLoading ? "Synchronizing..." : "Initialize Link"}
             </button>
           </form>
 
@@ -117,18 +152,14 @@ export default function LoginPage() {
           <div className="mt-8 pt-6 border-t border-border-color text-center">
             <div className="flex justify-center items-center gap-2 text-text-muted text-xs uppercase tracking-widest">
               <span className="material-symbols-outlined text-base">verified_user</span>
-              Classified Access Only
+              {isSoldierMode ? "Operative Access" : "Classified Access Only"}
             </div>
-            <p className="mt-2 text-text-dim text-xs leading-relaxed">
-              Unauthorized access or use of this system is strictly prohibited
-              and subject to criminal and civil penalties.
-            </p>
           </div>
 
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer remains identical */}
       <footer className="relative z-10 shrink-0 flex justify-between px-10 py-6 text-text-dim text-xs border-t border-border-light">
         <span>© 2024 Global Defense Systems</span>
         <div className="flex gap-6">

@@ -72,6 +72,31 @@ class FirebaseService {
       callback(squads);
     });
   }
+  async verifySoldierId(serviceId) {
+    try {
+      // 1. Create a query to find the soldier by Service ID
+      const soldiersRef = collection(db, "soldiers");
+      const q = query(soldiersRef, where("serviceId", "==", serviceId.toUpperCase().trim()));
+      
+      // 2. Execute the query
+      const querySnapshot = await getDocs(q);
+      
+      // 3. If a match is found, return the soldier data
+      if (!querySnapshot.empty) {
+        const soldierDoc = querySnapshot.docs[0];
+        return {
+          id: soldierDoc.id,
+          ...soldierDoc.data()
+        };
+      }
+      
+      // 4. Return null if no soldier matches
+      return null;
+    } catch (error) {
+      console.error("Firebase Service Error (Auth):", error);
+      throw error;
+    }
+  }
 
  /* ---------------- OPERATIVE ACTIONS ---------------- */
 
@@ -132,5 +157,7 @@ class FirebaseService {
     });
   }
 }
+
+
 
 export default new FirebaseService();

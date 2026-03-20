@@ -16,7 +16,7 @@ function App() {
         <Route path="/" element={<LoginPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/Dashboard" element={<Dashboard />} />
-        <Route path="/watch" element={<WatchFace />} />
+        <Route path="/Watch/:soldierId" element={<WatchFace />} />
 
         {/* Nested Operative Routes */}
         <Route path="/operative/:soldierId" element={<OperativeLayout />}>
