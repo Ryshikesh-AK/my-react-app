@@ -34,6 +34,7 @@ export const MissionProvider = ({ children }) => {
         updateSquad: firebaseService.updateSquad,
         deleteSquad: firebaseService.deleteSquad,
         addOperative: firebaseService.addOperative,
+        updateOperative: firebaseService.updateOperative,
         deleteOperative: firebaseService.deleteOperative
     };
 

@@ -60,14 +60,18 @@ class FirebaseService {
     });
   }
 
-  /* ---------------- OPERATIVE ACTIONS ---------------- */
+ /* ---------------- OPERATIVE ACTIONS ---------------- */
 
   async addOperative(squadId, formData) {
     try {
       return await addDoc(collection(db, "soldiers"), {
-        name: formData.callsign || "UNNAMED",
+        // CHANGE: Use formData.name to match your OperativeModal
+        name: formData.name || "UNNAMED", 
         rank: formData.rank || "OPERATIVE",
-        bpm: parseInt(formData.restingHeartRate) || 72,
+        serviceId: formData.serviceId || "N/A", // Added to match modal
+        device: formData.device || "MW-BIO-091", // Added to match modal
+        bpm: parseInt(formData.bpm) || 72,
+        spo2: parseInt(formData.spo2) || 98,
         squadId: squadId,
         status: "STABLE",
         createdAt: serverTimestamp(),
@@ -82,13 +86,16 @@ class FirebaseService {
   async updateOperative(operativeId, updateData) {
     try {
       const operativeRef = doc(db, "soldiers", operativeId);
-      await updateDoc(operativeRef, updateData);
+      // Ensure updateData contains 'name' and not 'callsign'
+      await updateDoc(operativeRef, {
+        ...updateData,
+        updatedAt: serverTimestamp() // Good practice for tracking changes
+      });
     } catch (error) {
       console.error("Firebase Service Error (Update Operative):", error);
       throw error;
     }
-  }
-
+  }  
   // NEW: Delete Operative
   async deleteOperative(operativeId) {
     try {
