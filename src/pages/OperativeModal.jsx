@@ -90,9 +90,10 @@ const OperativeModal = ({ isOpen, onClose, onAddAgent, initialData }) => {
                 <input 
                   required
                   name="serviceId"
-                  value={formData.serviceId}
+                 value={initialData ? formData.serviceId : "PENDING DEPLOYMENT..."}
                   onChange={handleChange}
                   type="text" 
+                  readOnly={true}
                   placeholder="ID-XXXXX"
                   className="w-full bg-[#111827] border border-cyan-500/20 rounded p-3 text-sm text-white focus:border-cyan-400 outline-none transition-all placeholder:text-cyan-900"
                 />

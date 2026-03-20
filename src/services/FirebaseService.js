@@ -8,9 +8,22 @@ import {
   serverTimestamp,
   doc,           // Added for referencing specific documents
   updateDoc,    // Added for editing
-  deleteDoc     // Added for deleting
+  deleteDoc,    // Added for deleting
+  where,
+  getDocs
 } from 'firebase/firestore';
 
+const generateTacticalId = async (squadId, squadName) => {
+  // 1. Get Short Name (First 2 letters of squad)
+  const prefix = squadName ? squadName.substring(0, 2).toUpperCase() : "OP";
+  
+  // 2. Get current count of soldiers in this squad for the serial
+  const q = query(collection(db, "soldiers"), where("squadId", "==", squadId));
+  const snapshot = await getDocs(q);
+  const serialNumber = (snapshot.size + 1).toString().padStart(2, '0');
+  
+  return `${prefix}-${serialNumber}`; // Result: AL-01
+};
 class FirebaseService {
   /* ---------------- SQUAD ACTIONS ---------------- */
 
@@ -62,13 +75,14 @@ class FirebaseService {
 
  /* ---------------- OPERATIVE ACTIONS ---------------- */
 
-  async addOperative(squadId, formData) {
+  async addOperative(squadId, squadName,formData) {
     try {
+      const autoId = await generateTacticalId(squadId, squadName);
       return await addDoc(collection(db, "soldiers"), {
         // CHANGE: Use formData.name to match your OperativeModal
         name: formData.name || "UNNAMED", 
         rank: formData.rank || "OPERATIVE",
-        serviceId: formData.serviceId || "N/A", // Added to match modal
+        serviceId: autoId, // Auto-generated based on Squad
         device: formData.device || "MW-BIO-091", // Added to match modal
         bpm: parseInt(formData.bpm) || 72,
         spo2: parseInt(formData.spo2) || 98,

@@ -106,7 +106,9 @@ export default function Dashboard() {
         await updateOperative(editingSoldier.id, formData);
       } else {
         if (!activeSquadId) return alert("Select squad.");
-        await addOperative(activeSquadId, formData);
+        const squad = squads.find(s => s.id === activeSquadId);
+        const squadName = squad ? squad.name : '';
+        await addOperative(activeSquadId, squadName, formData);
       }
       handleCloseModal();
     } catch (error) {
