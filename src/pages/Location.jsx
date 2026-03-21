@@ -1,13 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Activity, ShieldAlert } from 'lucide-react';
+import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
+import { useOutletContext } from 'react-router-dom';
+import { useMission } from '../context/MissionContext';
 
-const Location = ({ soldiers = [], activeSquadId = 1, embedded = false }) => {
-  // If embedded, we might get soldiers/squad info from context, but keeping props for now or assuming context usage if needed.
-  // Actually, let's switch to using Context if we want true "embedded" support without passing props down manually from App.
-  // But for now, let's just handle the UI hiding.
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-  // 1. Filter soldiers and ensure we handle empty states gracefully
+const Location = ({ embedded = false }) => {
+  const context = useOutletContext();
+  const soldier = context?.soldier;
+  const { soldiers, squads } = useMission();
+
+  const activeSquadId = soldier ? soldier.squadId : 1;
   const activeSquadUnits = soldiers.filter(s => s.squadId === activeSquadId);
+  const activeSquad = squads.find(s => s.id === activeSquadId);
+
+  const centerCoords = soldier?.coordinates || activeSquad?.coordinates || [0, 0];
+  const [mapPosition, setMapPosition] = useState({ coordinates: centerCoords, zoom: 14 });
+
+  // Update map if the selected soldier changes
+  useEffect(() => {
+    if (soldier?.coordinates) {
+      setMapPosition({ coordinates: soldier.coordinates, zoom: 16 });
+    }
+  }, [soldier?.coordinates]);
+
+  const handleMoveEnd = (position) => setMapPosition(position);
+
+  // Scaling logic to make markers physically scale visually
+  const visualGrowth = Math.pow(mapPosition.zoom, 0.5);
+  const scale = visualGrowth / mapPosition.zoom;
+  const textScale = Math.pow(mapPosition.zoom, 0.3) / mapPosition.zoom;
 
   return (
     <div className={`flex h-screen bg-[#0a0d17] text-slate-300 font-sans overflow-hidden ${embedded ? 'h-full' : ''}`}>
@@ -41,34 +64,7 @@ const Location = ({ soldiers = [], activeSquadId = 1, embedded = false }) => {
                     }`}
                 >
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="size-10 rounded bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${unit.name}`}
-                          alt="avatar"
-                          className="size-8"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white">{unit.name}</h3>
-                        <p className="text-[9px] text-blue-400 font-bold uppercase">{unit.rank}</p>
-                      </div>
-                    </div>
-                    {unit.status === 'CRITICAL' && <ShieldAlert size={14} className="text-red-500 animate-pulse" />}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-black/40 p-2 rounded border border-white/5 flex justify-between items-center">
-                      <p className="text-[8px] text-slate-500 uppercase font-bold">HR: <span className="text-white">{unit.bpm}</span></p>
-                      <div className={`size-1 rounded-full ${unit.bpm > 100 ? 'bg-red-500 animate-ping' : 'bg-green-500'}`} />
-                    </div>
-                    <div className="bg-black/40 p-2 rounded border border-white/5">
-                      <p className="text-[8px] text-slate-500 uppercase font-bold">STATUS:
-                        <span className={`ml-1 ${unit.status === 'CRITICAL' ? 'text-red-500' : 'text-green-500'}`}>
-                          {unit.status}
-                        </span>
-                      </p>
-                    </div>
+                     <h3 className="text-sm font-bold text-white">{unit.name}</h3>
                   </div>
                 </div>
               ))}
@@ -78,51 +74,77 @@ const Location = ({ soldiers = [], activeSquadId = 1, embedded = false }) => {
       )}
 
       {/* MAIN MAP AREA */}
-      <main className="flex-1 flex flex-col relative bg-[#1c1f26]">
-        <div className="flex-1 relative overflow-hidden bg-[#11141b] bg-[radial-gradient(#2d385e_1px,transparent_1px)] [background-size:40px_40px]">
+      <main className="flex-1 flex flex-col relative bg-[#02040a]">
+        <div className="absolute inset-0 z-0 bg-[#02040a]">
+          <ComposableMap projectionConfig={{ scale: 220 }} className="w-full h-full opacity-100 cursor-move">
+            <ZoomableGroup 
+              center={mapPosition.coordinates} 
+              zoom={mapPosition.zoom} 
+              onMoveEnd={handleMoveEnd}
+              minZoom={1} 
+              maxZoom={24}
+            >
+              <Geographies geography={geoUrl}>
+                {({ geographies }) => geographies.map((geo) => (
+                  <Geography key={geo.rsmKey} geography={geo} fill="#1e293b" stroke="#334155" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />
+                ))}
+              </Geographies>
 
-          {/* Map Grid Overlay */}
-          <div className="absolute inset-0 opacity-20 pointer-events-none border-[20px] border-[#0a0d17] z-20"></div>
+              {/* SQUAD CENTER MARKER */}
+              {activeSquad?.coordinates && (
+                <Marker coordinates={activeSquad.coordinates} className="pointer-events-none">
+                   <circle r={3 * scale} fill="#3b82f6" className="opacity-40" />
+                   <circle r={10 * scale} fill="none" stroke="#3b82f6" strokeWidth={1 * scale} className="opacity-20 border-dashed" />
+                </Marker>
+              )}
 
-          <div className="absolute inset-0">
-            {activeSquadUnits.map((unit, index) => {
-              // If you don't have X/Y in DB yet, we use a predictable spread
-              const topPos = unit.posY || (30 + (index * 12));
-              const leftPos = unit.posX || (40 + (index * 8));
-
-              return (
-                <div
-                  key={unit.id}
-                  style={{ top: `${topPos}%`, left: `${leftPos}%` }}
-                  className="absolute transition-all duration-1000"
-                >
-                  <div className="relative group cursor-pointer">
-                    {/* Pulsing effect for Critical status */}
-                    {unit.status === 'CRITICAL' && (
-                      <div className="absolute inset-0 size-8 bg-red-600 rounded-full animate-ping opacity-75"></div>
+              {/* OPERATIVE MARKERS */}
+              {activeSquadUnits.map(unit => {
+                if (!unit.coordinates) return null;
+                const isSelected = unit.id === soldier?.id;
+                // Highlight yellow/gold if selected, red if critical, blue otherwise
+                const color = unit.status === 'CRITICAL' ? '#ef4444' : (isSelected ? '#facc15' : '#60a5fa');
+                
+                return (
+                  <Marker key={unit.id} coordinates={unit.coordinates} className="group">
+                    <polygon 
+                      points={`0,-${1.5 * scale} ${1.2 * scale},${1.2 * scale} -${1.2 * scale},${1.2 * scale}`} 
+                      fill={color} 
+                      className={isSelected || unit.status === 'CRITICAL' ? 'animate-pulse' : ''} 
+                    />
+                    
+                    {/* Ring highlight for the selected person */}
+                    {isSelected && (
+                       <circle r={4 * scale} fill="none" stroke={color} strokeWidth={0.5 * scale} className="animate-ping" />
                     )}
+                    
+                    {/* Hit area */}
+                    <circle r={4 * scale} fill="transparent" />
+                    
+                    <text
+                       textAnchor="middle"
+                       y={-(2.5 * scale)}
+                       style={{ fontFamily: "monospace", fill: color, fontSize: `${2.5 * textScale}px` }}
+                       className={isSelected ? "font-bold" : "opacity-0 group-hover:opacity-100 transition-opacity"}
+                    >
+                       {isSelected ? `[ TARGET: ${unit.name} ]` : unit.name}
+                    </text>
+                  </Marker>
+                );
+              })}
+            </ZoomableGroup>
+          </ComposableMap>
+        </div>
 
-                    <div className={`size-8 rounded-full border-2 border-white flex items-center justify-center text-white shadow-2xl relative z-10 transition-colors ${unit.status === 'CRITICAL' ? 'bg-red-600' : 'bg-blue-600'
-                      }`}>
-                      <User size={14} fill="currentColor" />
-                    </div>
-
-                    {/* Label Tag */}
-                    <div className="bg-[#0d111c] border border-slate-700 text-[9px] font-black px-2 py-1 rounded absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap shadow-xl">
-                      <span className="text-slate-500 mr-1">{unit.rank}</span>
-                      <span className="text-white">{unit.name}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        {/* Map Coordinates UI */}
+        <div className="absolute bottom-6 right-6 p-4 bg-black/60 border border-[#1a2238] rounded shadow-2xl backdrop-blur-md pointer-events-none z-10 w-48">
+          <div className="flex items-center gap-2 border-b border-[#1a2238] pb-2 mb-2">
+            <div className="size-1.5 bg-yellow-400 rounded animate-pulse" />
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-300">Target Config</h3>
           </div>
-
-          {/* Map Coordinates UI */}
-          <div className="absolute bottom-6 right-6 p-4 bg-black/60 border border-white/10 rounded backdrop-blur-md">
-            <p className="text-[10px] font-mono text-blue-400">LAT: 34.0522° N</p>
-            <p className="text-[10px] font-mono text-blue-400">LNG: 118.2437° W</p>
-          </div>
+          <p className="text-[10px] font-mono text-blue-400 mb-1">LAT: {mapPosition.coordinates[1].toFixed(4)}°</p>
+          <p className="text-[10px] font-mono text-blue-400 mb-1">LNG: {mapPosition.coordinates[0].toFixed(4)}°</p>
+          <p className="text-[10px] font-mono text-slate-500 mt-2">ZOOM: {Math.round(mapPosition.zoom)}x</p>
         </div>
       </main>
     </div>
