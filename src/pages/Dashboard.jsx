@@ -54,13 +54,13 @@ export default function Dashboard() {
   const [mapPosition, setMapPosition] = useState({ coordinates: [0, 0], zoom: 1 });
 
   const handleZoomIn = () => {
-    if (mapPosition.zoom >= 8) return;
-    setMapPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 }));
+    if (mapPosition.zoom >= 20) return;
+    setMapPosition(pos => ({ ...pos, zoom: Math.min(pos.zoom * 1.5, 20) }));
   };
 
   const handleZoomOut = () => {
     if (mapPosition.zoom <= 1) return;
-    setMapPosition(pos => ({ ...pos, zoom: pos.zoom / 1.5 }));
+    setMapPosition(pos => ({ ...pos, zoom: Math.max(pos.zoom / 1.5, 1) }));
   };
 
   const handleResetZoom = () => {
@@ -84,7 +84,7 @@ export default function Dashboard() {
       if (activeSquad && activeSquad.coordinates) {
         setMapPosition({
           coordinates: activeSquad.coordinates,
-          zoom: 4 
+          zoom: 12 
         });
       }
     }
@@ -156,7 +156,26 @@ export default function Dashboard() {
         if (!activeSquadId) return alert("Select squad.");
         const squad = squads.find(s => s.id === activeSquadId);
         const squadName = squad ? squad.name : '';
-        await addOperative(activeSquadId, squadName, formData);
+        
+        // 10km to 20km true radial offset mapping
+        let opCoords = null;
+        if (squad?.coordinates) {
+          const angle = Math.random() * Math.PI * 2;
+          const minRadiusDeg = 10 / 111; // 10km in degrees
+          const maxRadiusDeg = 20 / 111; // 20km in degrees
+          const radiusDeg = minRadiusDeg + Math.random() * (maxRadiusDeg - minRadiusDeg);
+          
+          // Longitude scale correction based on Earth's curvature at given Latitude
+          const latRad = squad.coordinates[1] * (Math.PI / 180);
+          const lonScale = 1 / Math.abs(Math.cos(latRad));
+          
+          opCoords = [
+             squad.coordinates[0] + (Math.cos(angle) * radiusDeg * lonScale), // Longitude
+             squad.coordinates[1] + (Math.sin(angle) * radiusDeg)             // Latitude
+          ];
+        }
+
+        await addOperative(activeSquadId, squadName, { ...formData, coordinates: opCoords });
       }
       handleCloseModal();
     } catch (error) {
@@ -234,7 +253,7 @@ export default function Dashboard() {
               zoom={mapPosition.zoom} 
               onMoveEnd={handleMoveEnd}
               minZoom={1} 
-              maxZoom={8}
+              maxZoom={20}
             >
               <Geographies geography={geoUrl}>
                 {({ geographies }) => geographies.map((geo) => (
@@ -246,6 +265,11 @@ export default function Dashboard() {
                 const mainColor = isActive ? "#22c55e" : "#3b82f6"; // Green if active, Blue otherwise
                 const textColor = isActive ? "#4ade80" : "#93c5fd";
                 
+                // Allow markers to visually zoom up to ~3.5x size at max zoom
+                const visualGrowth = Math.pow(mapPosition.zoom, 0.5); 
+                const scale = visualGrowth / mapPosition.zoom;
+                const textScale = Math.pow(mapPosition.zoom, 0.3) / mapPosition.zoom; // Text grows slightly slower
+
                 return squad.coordinates ? (
                   <Marker 
                     key={squad.id} 
@@ -253,15 +277,48 @@ export default function Dashboard() {
                     onClick={() => setActiveSquadId(squad.id)}
                     className="cursor-pointer hover:opacity-80 transition-opacity"
                   >
-                     <circle r={4 / mapPosition.zoom} fill={mainColor} className={isActive ? "" : "animate-pulse"} />
-                     <circle r={(isActive ? 20 : 14) / mapPosition.zoom} fill="none" stroke={mainColor} strokeWidth={1 / mapPosition.zoom} className="animate-ping" />
+                     <circle r={3 * scale} fill={mainColor} className={isActive ? "" : "animate-pulse"} />
+                     <circle r={(isActive ? 16 : 10) * scale} fill="none" stroke={mainColor} strokeWidth={1 * scale} className="animate-ping" />
                      <text
                        textAnchor="middle"
-                       y={-( (isActive ? 16 : 10) / mapPosition.zoom )}
-                       style={{ fontFamily: "monospace", fill: textColor, fontSize: `${5 / mapPosition.zoom}px`, fontWeight: "bold" }}
+                       y={-( (isActive ? 14 : 9) * scale )}
+                       style={{ fontFamily: "monospace", fill: textColor, fontSize: `${5 * textScale}px`, fontWeight: "bold" }}
                      >
-                       {squad.name}
+                       <tspan x="0" dy="0">{squad.name}</tspan>
+                       {mapPosition.zoom > 5 && squad.location && (
+                         <tspan x="0" dy={`${6 * textScale}px`} fill="#64748b" fontSize={`${3.5 * textScale}px`} fontWeight="normal" className="tracking-widest">
+                           {squad.location.toUpperCase()}
+                         </tspan>
+                       )}
                      </text>
+                  </Marker>
+                ) : null;
+              })}
+              
+              {/* RENDER OPERATIVES FOR ACTIVE SQUAD */}
+              {activeSquadId && filteredSoldiers.map(soldier => {
+                const visualGrowth = Math.pow(mapPosition.zoom, 0.5);
+                const scale = visualGrowth / mapPosition.zoom;
+                const textScale = Math.pow(mapPosition.zoom, 0.3) / mapPosition.zoom;
+                
+                return soldier.coordinates ? (
+                  <Marker key={soldier.id} coordinates={soldier.coordinates} onClick={() => handleCardClick(soldier)} className="cursor-pointer hover:opacity-80 transition-opacity group">
+                    {/* Tactical Triangle Style for Operatives */}
+                    <polygon 
+                      points={`0,-${1.5 * scale} ${1.2 * scale},${1.2 * scale} -${1.2 * scale},${1.2 * scale}`} 
+                      fill={soldier.status === 'CRITICAL' ? '#ef4444' : '#60a5fa'} 
+                      className={soldier.status === 'CRITICAL' ? 'animate-pulse' : ''} 
+                    />
+                    {/* Hidden hit-area for easier clicking */}
+                    <circle r={4 * scale} fill="transparent" />
+                    <text
+                       textAnchor="middle"
+                       y={-(2.5 * scale)}
+                       style={{ fontFamily: "monospace", fill: soldier.status === 'CRITICAL' ? '#fca5a5' : '#bfdbfe', fontSize: `${2.5 * textScale}px` }}
+                       className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                       {soldier.name}
+                    </text>
                   </Marker>
                 ) : null;
               })}

@@ -116,6 +116,7 @@ class FirebaseService {
         bpm: parseInt(formData.bpm) || 72,
         spo2: parseInt(formData.spo2) || 98,
         squadId: squadId,
+        coordinates: formData.coordinates || null,
         status: "STABLE",
         createdAt: serverTimestamp(),
       });
