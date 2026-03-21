@@ -77,6 +77,19 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
+// PASTE THE NEW AUTO-ZOOM EFFECT HERE:
+  useEffect(() => {
+    if (activeSquadId) {
+      const activeSquad = squads.find(s => s.id === activeSquadId);
+      if (activeSquad && activeSquad.coordinates) {
+        setMapPosition({
+          coordinates: activeSquad.coordinates,
+          zoom: 4 
+        });
+      }
+    }
+  }, [activeSquadId, squads]);
+
   const filteredSoldiers = soldiers.filter(s => s.squadId === activeSquadId);
   const criticalCount = filteredSoldiers.filter(s => s.status === 'CRITICAL').length;
 
