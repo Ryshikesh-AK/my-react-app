@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
 import OperativeModal from './OperativeModal';
+import SquadModal from './SquadModal';
 import { useMission } from '../context/MissionContext';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -12,9 +13,8 @@ const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
   return (
     <div
       onClick={onClick}
-      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${
-        isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
-      }`}
+      className={`bg-[#0a0f1e]/90 backdrop-blur-md border p-3 transition-all cursor-pointer group rounded ${isCritical ? 'border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : 'border-[#1a2238] hover:border-blue-500/50'
+        }`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -26,10 +26,13 @@ const OperativeCard = ({ soldier, onClick, onEdit, onDelete }) => {
           <span onClick={(e) => { e.stopPropagation(); onDelete(); }} className="material-symbols-outlined text-[14px] hover:text-red-500">delete</span>
         </div>
       </div>
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end mt-2">
         <div>
           <p className="text-[8px] text-[#4a5578] uppercase font-black">{soldier.rank}</p>
-          <p className="text-xl font-mono font-bold text-white leading-none">{soldier.bpm}<span className="text-[9px] ml-1 text-blue-500 font-normal">BPM</span></p>
+          <p className="text-xl font-mono font-bold text-white leading-none tracking-tighter">{soldier.bpm}<span className="text-[9px] ml-1 text-blue-500 font-normal tracking-normal">BPM</span></p>
+        </div>
+        <div className="text-[9px] font-mono font-bold text-blue-400 border border-blue-500/30 px-2 py-1 rounded bg-blue-500/10 tracking-widest uppercase shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+          ID:{soldier.serviceId}
         </div>
       </div>
     </div>
@@ -45,7 +48,29 @@ export default function Dashboard() {
   const [activeSquadId, setActiveSquadId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSoldier, setEditingSoldier] = useState(null); // TRACKS CURRENT EDIT TARGET
+  const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
+  const [editingSquad, setEditingSquad] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [mapPosition, setMapPosition] = useState({ coordinates: [0, 0], zoom: 1 });
+
+  const handleZoomIn = () => {
+    if (mapPosition.zoom >= 8) return;
+    setMapPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 }));
+  };
+
+  const handleZoomOut = () => {
+    if (mapPosition.zoom <= 1) return;
+    setMapPosition(pos => ({ ...pos, zoom: pos.zoom / 1.5 }));
+  };
+
+  const handleResetZoom = () => {
+    setMapPosition({ coordinates: [0, 0], zoom: 1 });
+  };
+
+  const handleMoveEnd = (position) => {
+    setMapPosition(position);
+  };
+
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -56,17 +81,27 @@ export default function Dashboard() {
   const criticalCount = filteredSoldiers.filter(s => s.status === 'CRITICAL').length;
 
   /* -------- SQUAD CRUD FUNCTIONS -------- */
-  const handleAddSquad = async () => {
-    const name = prompt("Enter new squad name:");
-    if (name?.trim()) {
-      try { await addSquad(name); } catch (error) { console.error("Uplink Failure:", error); }
-    }
+  const handleAddSquadClick = () => {
+    setEditingSquad(null);
+    setIsSquadModalOpen(true);
   };
 
-  const handleEditSquad = async (id, currentName) => {
-    const newName = prompt("Rename Squad Asset:", currentName);
-    if (newName?.trim() && newName !== currentName) {
-      try { await updateSquad(id, newName); } catch (error) { console.error("Update Failure:", error); }
+  const handleEditSquadClick = (squad) => {
+    setEditingSquad(squad);
+    setIsSquadModalOpen(true);
+  };
+
+  const handleSaveSquad = async (squadData) => {
+    try {
+      if (editingSquad) {
+        await updateSquad(editingSquad.id, squadData);
+      } else {
+        await addSquad(squadData);
+      }
+      setIsSquadModalOpen(false);
+      setEditingSquad(null);
+    } catch (error) {
+      console.error("Squad Save Failure:", error);
     }
   };
 
@@ -80,7 +115,7 @@ export default function Dashboard() {
   };
 
   /* -------- OPERATIVE FUNCTIONS -------- */
-  
+
   // Open modal for NEW agent
   const handleOpenDeployModal = () => {
     setEditingSoldier(null);
@@ -123,7 +158,14 @@ export default function Dashboard() {
 
       {/* SIDEBAR */}
       <aside className="w-72 bg-[#050810] border-r border-[#1a2238] flex flex-col relative z-20 shadow-2xl">
-        <div className="p-6 border-b border-[#1a2238] bg-[#080b14]">
+        <div 
+          onClick={() => {
+            setActiveSquadId(null);
+            setMapPosition({ coordinates: [0, 0], zoom: 1 });
+          }}
+          className="p-6 border-b border-[#1a2238] bg-[#080b14] cursor-pointer hover:bg-[#0a0f1e] transition-colors"
+          title="Return to Global View"
+        >
           <h1 className="text-sm font-black tracking-[0.3em] text-blue-500 flex items-center gap-2">
             <span className="material-symbols-outlined text-sm">radar</span> COMMAND CENTER
           </h1>
@@ -136,11 +178,10 @@ export default function Dashboard() {
               <div
                 key={squad.id}
                 onClick={() => setActiveSquadId(squad.id)}
-                className={`group w-full p-3 rounded flex justify-between items-center cursor-pointer border transition-all ${
-                  activeSquadId === squad.id
-                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)]'
-                  : 'bg-transparent border-transparent hover:bg-[#0d1117] hover:border-[#1a2238]'
-                }`}
+                className={`group w-full p-3 rounded flex justify-between items-center cursor-pointer border transition-all ${activeSquadId === squad.id
+                    ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)]'
+                    : 'bg-transparent border-transparent hover:bg-[#0d1117] hover:border-[#1a2238]'
+                  }`}
               >
                 <div className="flex flex-col">
                   <span className={`text-[10px] font-black uppercase tracking-widest ${activeSquadId === squad.id ? 'text-blue-400' : 'text-[#4a5578]'}`}>
@@ -149,13 +190,13 @@ export default function Dashboard() {
                   <span className="text-[8px] text-[#4a5578] font-bold">{count} UNITS ACTIVE</span>
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span onClick={(e) => { e.stopPropagation(); handleEditSquad(squad.id, squad.name); }} className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-blue-400">edit</span>
+                  <span onClick={(e) => { e.stopPropagation(); handleEditSquadClick(squad); }} className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-blue-400">edit</span>
                   <span onClick={(e) => { e.stopPropagation(); handleDeleteSquad(squad.id); }} className="material-symbols-outlined text-[16px] text-[#4a5578] hover:text-red-500">delete</span>
                 </div>
               </div>
             );
           })}
-          <button onClick={handleAddSquad} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-[#1a2238] p-3 rounded text-[9px] font-black uppercase text-[#4a5578] hover:border-blue-500 hover:text-white transition-all mt-4">
+          <button onClick={handleAddSquadClick} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-[#1a2238] p-3 rounded text-[9px] font-black uppercase text-[#4a5578] hover:border-blue-500 hover:text-white transition-all mt-4">
             <span className="material-symbols-outlined text-sm">add</span> Initialize New Squad
           </button>
         </nav>
@@ -173,14 +214,59 @@ export default function Dashboard() {
 
       {/* MAIN VIEWPORT */}
       <main className="flex-1 relative flex flex-col overflow-hidden">
-        <div className="absolute inset-0 z-0 pointer-events-none bg-[#02040a]">
-          <ComposableMap projectionConfig={{ scale: 220 }} className="w-full h-full opacity-20">
-            <Geographies geography={geoUrl}>
-              {({ geographies }) => geographies.map((geo) => (
-                <Geography key={geo.rsmKey} geography={geo} fill="#1e293b" stroke="#334155" strokeWidth={0.5} style={{ default: { outline: "none" } }} />
-              ))}
-            </Geographies>
+        <div className="absolute inset-0 z-0 bg-[#02040a]">
+          <ComposableMap projectionConfig={{ scale: 220 }} className="w-full h-full opacity-100 cursor-move">
+            <ZoomableGroup 
+              center={mapPosition.coordinates} 
+              zoom={mapPosition.zoom} 
+              onMoveEnd={handleMoveEnd}
+              minZoom={1} 
+              maxZoom={8}
+            >
+              <Geographies geography={geoUrl}>
+                {({ geographies }) => geographies.map((geo) => (
+                  <Geography key={geo.rsmKey} geography={geo} fill="#1e293b" stroke="#334155" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />
+                ))}
+              </Geographies>
+              {squads.map(squad => {
+                const isActive = activeSquadId === squad.id;
+                const mainColor = isActive ? "#22c55e" : "#3b82f6"; // Green if active, Blue otherwise
+                const textColor = isActive ? "#4ade80" : "#93c5fd";
+                
+                return squad.coordinates ? (
+                  <Marker 
+                    key={squad.id} 
+                    coordinates={squad.coordinates}
+                    onClick={() => setActiveSquadId(squad.id)}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                     <circle r={4 / mapPosition.zoom} fill={mainColor} className={isActive ? "" : "animate-pulse"} />
+                     <circle r={(isActive ? 20 : 14) / mapPosition.zoom} fill="none" stroke={mainColor} strokeWidth={1 / mapPosition.zoom} className="animate-ping" />
+                     <text
+                       textAnchor="middle"
+                       y={-( (isActive ? 16 : 10) / mapPosition.zoom )}
+                       style={{ fontFamily: "monospace", fill: textColor, fontSize: `${5 / mapPosition.zoom}px`, fontWeight: "bold" }}
+                     >
+                       {squad.name}
+                     </text>
+                  </Marker>
+                ) : null;
+              })}
+            </ZoomableGroup>
           </ComposableMap>
+        </div>
+
+        {/* MAP CONTROLS */}
+        <div className="absolute bottom-16 right-8 z-20 flex flex-col gap-2 pointer-events-auto">
+          <button onClick={handleZoomIn} title="Zoom In" className="bg-[#1a2238]/80 hover:bg-blue-600 border border-[#2a3248] p-2 rounded shadow-lg backdrop-blur text-white flex items-center justify-center transition-all group">
+            <span className="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">add</span>
+          </button>
+          <button onClick={handleZoomOut} title="Zoom Out" className="bg-[#1a2238]/80 hover:bg-blue-600 border border-[#2a3248] p-2 rounded shadow-lg backdrop-blur text-white flex items-center justify-center transition-all group">
+            <span className="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">remove</span>
+          </button>
+          <button onClick={handleResetZoom} title="Reset View" className="bg-[#1a2238]/80 hover:bg-red-600 border border-[#2a3248] p-2 rounded shadow-lg backdrop-blur text-white flex items-center justify-center transition-all group mt-2">
+            <span className="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">fit_screen</span>
+          </button>
         </div>
 
         <header className="h-16 border-b border-[#1a2238] flex items-center justify-between px-8 relative z-10 bg-[#02040a]/40 backdrop-blur-md">
@@ -199,8 +285,8 @@ export default function Dashboard() {
           </button>
         </header>
 
-        <div className="flex-1 p-8 relative z-10 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex-1 p-8 relative z-10 overflow-y-auto pointer-events-none">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pointer-events-auto">
             {filteredSoldiers.map(s => (
               <OperativeCard
                 key={s.id}
@@ -220,11 +306,18 @@ export default function Dashboard() {
       </main>
 
       {/* MODAL HANDLES BOTH ADD AND EDIT */}
-      <OperativeModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
-        onAddAgent={handleSaveOperative} 
+      <OperativeModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onAddAgent={handleSaveOperative}
         initialData={editingSoldier} // PASS DATA TO MODAL
+      />
+
+      <SquadModal 
+        isOpen={isSquadModalOpen}
+        onClose={() => { setIsSquadModalOpen(false); setEditingSquad(null); }}
+        onSave={handleSaveSquad}
+        initialData={editingSquad}
       />
     </div>
   );

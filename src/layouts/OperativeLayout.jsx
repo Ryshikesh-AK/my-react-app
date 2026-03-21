@@ -47,7 +47,12 @@ const OperativeLayout = () => {
                         <div className={`absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-[#101422] ${globalAlert ? 'bg-rose-500 animate-ping' : 'bg-emerald-500'}`} />
                     </div>
                     <div>
-                        <h2 className="text-xs font-bold text-white uppercase">{soldier.name}</h2>
+                        <h2 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                            {soldier.name}
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono tracking-widest border border-blue-500/20">
+                                {soldier.serviceId}
+                            </span>
+                        </h2>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{soldier.rank}</p>
                     </div>
                 </div>
