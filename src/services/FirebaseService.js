@@ -27,10 +27,14 @@ const generateTacticalId = async (squadId, squadName) => {
 class FirebaseService {
   /* ---------------- SQUAD ACTIONS ---------------- */
 
-  async addSquad(squadName) {
+  async addSquad(squadData) {
     try {
       return await addDoc(collection(db, "squads"), {
-        name: squadName,
+        name: squadData.name,
+        location: squadData.location || "UNKNOWN",
+        countryCode: squadData.countryCode || "",
+        cityName: squadData.cityName || "",
+        coordinates: squadData.coordinates || null,
         status: "ACTIVE",
         createdAt: serverTimestamp(),
       });
@@ -41,10 +45,10 @@ class FirebaseService {
   }
 
   // NEW: Update Squad Name
-  async updateSquad(squadId, newName) {
+  async updateSquad(squadId, squadData) {
     try {
       const squadRef = doc(db, "squads", squadId);
-      await updateDoc(squadRef, { name: newName });
+      await updateDoc(squadRef, squadData);
     } catch (error) {
       console.error("Firebase Service Error (Update Squad):", error);
       throw error;
