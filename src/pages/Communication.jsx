@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useMission } from '../context/MissionContext';
+// 🛰️ FIREBASE IMPORTS
+import { db } from '../Firebase'; 
+import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+
 import {
   Search, Bell, Settings, CircleAlert,
   MapPin, Radar, LayoutDashboard, Users,
   Phone, Video, Info, Paperclip, Smile,
   Send, Navigation, Shield, Wifi, Activity, MessageSquare, ChevronLeft,
-  X, Crosshair, Maximize2, Droplets, Heart
+  X, Crosshair, Maximize2, Droplets, Heart, CheckCheck
 } from 'lucide-react';
 
-// --- Sidebar Item Component ---
 const SidebarItem = ({ icon: Icon, label, active = false, onClick, badge }) => (
   <div
     onClick={onClick}
@@ -29,17 +32,89 @@ const CommunicationHub = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [showLargeMap, setShowLargeMap] = useState(false);
+  const [messages, setMessages] = useState([]); 
   
-  // DYNAMIC CONTEXT INJECTION
   const context = useOutletContext();
-  const soldier = context?.soldier;
+  const soldierFromContext = context?.soldier;
   const { squads, soldiers } = useMission();
   
+  // Find the most up-to-date soldier data from our MissionContext
+  const soldier = soldiers?.find(s => s.id === soldierFromContext?.id) || soldierFromContext;
+  const chatEndRef = useRef(null);
+
+  // --- 🛰️ FIREBASE REAL-TIME LISTENER ---
+  useEffect(() => {
+    if (!soldier?.id) return;
+
+    const unsub = onSnapshot(doc(db, "soldiers", soldier.id), (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        
+        // If the soldier sends an ACK, add it to the chat stream
+        if (data.lastMessageFromSoldier) {
+          const incomingMsg = {
+            id: Date.now(),
+            sender: 'soldier',
+            text: data.lastMessageFromSoldier,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          
+          setMessages(prev => {
+            // Prevent duplicate entries of the same ACK
+            if (prev.length > 0 && prev[prev.length - 1].text === data.lastMessageFromSoldier) return prev;
+            return [...prev, incomingMsg];
+          });
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [soldier?.id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // --- 📤 SEND COMMAND TO FIREBASE ---
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || !soldier?.id) return;
+
+    const commandText = input;
+    setInput('');
+
+    try {
+      await updateDoc(doc(db, "soldiers", soldier.id), {
+        lastMessageFromHQ: commandText,
+        hqMessageTime: serverTimestamp(),
+        lastMessageFromSoldier: "" // Clear previous ACK to prepare for new one
+      });
+
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        sender: 'admin',
+        text: commandText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch (error) {
+      console.error("Transmission Error:", error);
+    }
+  };
+
+  // --- 🚨 RESET SOS ALERT ---
+  const clearEmergency = async () => {
+    if (!soldier?.id) return;
+    try {
+      await updateDoc(doc(db, "soldiers", soldier.id), {
+        sosActive: false
+      });
+    } catch (error) {
+      console.error("Failed to clear SOS:", error);
+    }
+  };
+
   const currentSquad = squads?.find(s => s.id === soldier?.squadId);
-  const squadMembers = soldiers?.filter(s => s.squadId === soldier?.squadId) || [];
-  
-  const criticalMembers = squadMembers.filter(s => s.status === 'CRITICAL');
-  const isEmergencyActive = criticalMembers.length > 0;
+  const isEmergencyActive = soldier?.sosActive;
 
   return (
     <div className={`flex h-screen bg-[#0d101b] text-slate-200 font-sans overflow-hidden relative ${embedded ? 'h-full' : ''}`}>
@@ -79,128 +154,132 @@ const CommunicationHub = ({ embedded = false }) => {
           <nav className="flex-1 mt-6">
             <SidebarItem icon={LayoutDashboard} label="Dashboard" onClick={() => navigate('/Dashboard')} />
             <SidebarItem icon={Activity} label="Vitals" onClick={() => navigate('/operative-status')} />
-            <SidebarItem icon={MessageSquare} label="Messages" active badge="2" />
+            <SidebarItem icon={MessageSquare} label="Messages" active badge={messages.filter(m => m.sender === 'soldier').length || null} />
           </nav>
         </aside>
       )}
 
       {/* --- CENTER CHAT STREAM --- */}
       <main className="flex-1 flex flex-col bg-[#101422]">
+        
         <header className="h-20 border-b border-slate-800 px-10 flex items-center justify-between bg-[#101422]/80 backdrop-blur-md">
           <div className="flex items-center gap-6">
-            <div className="w-12 h-12 rounded-xl bg-blue-600/10 border border-blue-600/30 flex items-center justify-center text-blue-500">
-              <Users size={24} />
+            <div className="relative">
+              <div className="w-12 h-12 rounded-xl bg-blue-600/10 border border-blue-600/30 flex items-center justify-center text-blue-500 overflow-hidden">
+                <img 
+                  src={`https://api.dicebear.com/7.x/bottts/svg?seed=${soldier?.name || 'default'}`} 
+                  alt="avatar" 
+                  className="w-8 h-8 opacity-80"
+                />
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#101422] animate-pulse"></div>
             </div>
-            <h3 className="text-xl font-black tracking-tight text-white uppercase">{currentSquad?.name || 'Tactical'} Team Channel</h3>
-          </div>
-          <div className="flex gap-4">
-            <button className="p-3 bg-slate-800 hover:bg-blue-600 transition-colors rounded-lg"><Phone size={18} /></button>
-            <button className="p-3 bg-slate-800 hover:bg-blue-600 transition-colors rounded-lg"><Video size={18} /></button>
-            <button className="p-3 bg-slate-800 hover:bg-blue-600 transition-colors rounded-lg"><Info size={18} /></button>
+            <div>
+              <h3 className="text-xl font-black tracking-tight text-white uppercase leading-none">
+                {soldier?.name || 'Operative'} 
+              </h3>
+              <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest">
+                Uplink: Firebase Encrypted // {soldier?.rank || 'Field Agent'}
+              </p>
+            </div>
           </div>
         </header>
 
+        {/* SOS ALERT BOX */}
         {isEmergencyActive && (
-          <div className="bg-rose-600/10 border-b border-rose-600/30 px-10 py-4 flex justify-between items-center">
+          <div className="bg-rose-600/10 border-b border-rose-600/30 px-10 py-4 flex justify-between items-center animate-pulse">
             <div className="flex items-center gap-4">
-              <CircleAlert className="text-rose-600 animate-pulse" size={24} />
-              <p className="text-xs font-black text-rose-500 uppercase tracking-tight">SOS ALERT: {criticalMembers.map(m => m.name).join(', ')} // {currentSquad?.location || 'UNKNOWN SECTOR'}</p>
+              <CircleAlert className="text-rose-600" size={24} />
+              <p className="text-xs font-black text-rose-500 uppercase tracking-tight">SOS ALERT: {soldier?.name} // STATUS CRITICAL</p>
             </div>
-            <button className="bg-rose-600 hover:bg-rose-500 text-white px-6 py-2 rounded font-black text-[10px] uppercase transition-all shadow-[0_0_15px_rgba(225,29,72,0.4)]">Dispatch Medic</button>
+            <div className="flex gap-3">
+               <button className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded font-black text-[10px] uppercase transition-all shadow-lg shadow-rose-900/20">Dispatch Medic</button>
+               <button onClick={clearEmergency} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded font-black text-[10px] uppercase">Clear Alert</button>
+            </div>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-          <div className="flex gap-4 opacity-50">
-            <div className="size-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black">{soldier?.name?.substring(0, 2).toUpperCase() || 'OP'}</div>
-            <div className="bg-[#1a2036] border border-slate-800 p-4 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[70%] shadow-lg">
-              Proceeding to target sector. {currentSquad?.name || 'Unit'} currently holding position. Awaiting further tactical commands.
+        {/* --- DYNAMIC MESSAGE STREAM --- */}
+        <div className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar bg-[#0d101b]/30">
+          {messages.length === 0 && (
+             <div className="h-full flex flex-col items-center justify-center opacity-10">
+               <MessageSquare size={64} />
+               <p className="text-[10px] font-black tracking-[0.4em] uppercase mt-4">Secure Stream Initialized</p>
+             </div>
+          )}
+
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+              <div className={`flex flex-col ${msg.sender === 'admin' ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                <div className={`px-5 py-3 rounded-2xl text-sm shadow-lg border ${
+                  msg.sender === 'admin' 
+                    ? 'bg-blue-600 border-blue-500 text-white rounded-br-none' 
+                    : 'bg-[#1a2036] border-slate-800 text-slate-300 rounded-tl-none'
+                }`}>
+                  {msg.text}
+                </div>
+                <div className="flex items-center gap-2 mt-2 px-1">
+                  <span className="text-[9px] text-slate-600 font-mono uppercase">{msg.sender} • {msg.time}</span>
+                  {msg.sender === 'admin' && <CheckCheck size={12} className="text-blue-500" />}
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
+          <div ref={chatEndRef} />
         </div>
 
         <footer className="p-8 border-t border-slate-800 bg-[#0d101b]">
-          <div className="max-w-4xl mx-auto flex gap-4">
+          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex gap-4">
             <input 
-              className="flex-1 bg-[#1b2136] border border-slate-800 rounded-2xl py-5 px-8 text-sm outline-none focus:border-blue-500 transition-colors" 
-              placeholder="Enter tactical command..." 
+              className="flex-1 bg-[#1b2136] border border-slate-800 rounded-2xl py-5 px-8 text-sm outline-none focus:border-blue-500 transition-colors text-white placeholder-slate-600" 
+              placeholder={`Send command to ${soldier?.name || 'Operative'}...`} 
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button className="bg-blue-600 w-16 rounded-2xl flex items-center justify-center hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"><Send size={24} className="text-white" /></button>
-          </div>
+            <button 
+              type="submit"
+              className="bg-blue-600 w-16 rounded-2xl flex items-center justify-center hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+            >
+              <Send size={24} className="text-white" />
+            </button>
+          </form>
         </footer>
       </main>
 
       {/* --- RIGHT INFO PANEL --- */}
-      <aside className="w-80 border-l border-slate-800 bg-[#101422] p-4 hidden xl:flex flex-col gap-6">
-
-        {/* Unit Location Card with Pulse Animation */}
-        <section>
-          <h4 className="text-[10px] font-black text-[#919fca] uppercase tracking-[0.2em] mb-3">Unit Location</h4>
+      <aside className="w-80 border-l border-slate-800 bg-[#101422] p-6 hidden xl:flex flex-col">
+        <section className="mb-8">
+          <h4 className="text-[10px] font-black text-[#919fca] uppercase tracking-[0.2em] mb-4">Unit Location</h4>
           <div
             onClick={() => setShowLargeMap(true)}
-            className={`h-40 w-full rounded-lg bg-[#1b2136] border relative overflow-hidden group cursor-pointer transition-all duration-500 ${isEmergencyActive
+            className={`h-48 w-full rounded-lg bg-[#1b2136] border relative overflow-hidden group cursor-pointer transition-all duration-500 ${isEmergencyActive
               ? 'border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.2)] animate-pulse-tactical'
               : 'border-[#323f67] hover:border-blue-500'
               }`}
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#0f47f0]/20 to-transparent" />
             <img className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80" alt="Map" />
-
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${isEmergencyActive ? 'text-rose-500' : 'text-[#0f47f0]'} animate-pulse`}>
-              <Navigation fill="currentColor" size={24} />
+              <Navigation fill="currentColor" size={28} />
             </div>
-
-            {/* Emergency Scanning Line Overlay */}
-            {isEmergencyActive && <div className="absolute inset-0 bg-rose-500/5 pointer-events-none" />}
           </div>
-          <p className="text-[10px] text-[#919fca] mt-2 text-center font-mono tracking-widest">
-            {soldier?.coordinates ? `${soldier.coordinates[1].toFixed(4)}° N, ${soldier.coordinates[0].toFixed(4)}° W` : 'LOCATION_DISCONNECTED'}
-          </p>
-        </section>
-
-        {/* Squad Status Bars */}
-        <section className="space-y-4 flex-1">
-          <h4 className="text-[10px] font-black text-[#919fca] uppercase tracking-[0.2em] mb-1">Squad Status</h4>
-          
-          <div className="space-y-4 pr-2 overflow-y-auto max-h-[250px] custom-scrollbar">
-            {squadMembers.map(unit => {
-              const isCritical = unit.status === 'CRITICAL';
-              const isSelected = unit.id === soldier?.id;
-              const color = isCritical ? "bg-red-500" : (isSelected ? "bg-yellow-400" : "bg-green-500");
-              const textColor = isCritical ? "text-red-500" : (isSelected ? "text-yellow-400" : "text-green-500");
-  
-              return (
-                <div key={unit.id} className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] font-bold uppercase">
-                    <span className={isSelected ? "text-yellow-400" : "text-white"}>{unit.name} <span className="text-[8px] text-slate-500 opacity-50">({unit.rank})</span></span>
-                    <span className={textColor}>{unit.status}</span>
-                  </div>
-                  <div className="w-full h-1 bg-[#1b2136] rounded-full overflow-hidden">
-                    <div className={`h-full ${color} transition-all duration-1000 ${isCritical ? 'animate-pulse' : ''}`} style={{ width: `${Math.min(100, (unit.bpm / 120) * 100)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            
-            {squadMembers.length === 0 && (
-              <p className="text-xs text-slate-500 italic mt-4 text-center">NO SQUAD MEMBERS FOUND</p>
-            )}
+          <div className="mt-4 p-3 bg-slate-900/50 rounded border border-slate-800/50">
+             <p className="text-xs text-blue-400 text-center font-mono font-bold uppercase tracking-widest">
+               {soldier?.coordinates ? `${soldier.coordinates[1].toFixed(4)} N / ${soldier.coordinates[0].toFixed(4)} W` : 'UPLINKING...'}
+             </p>
           </div>
         </section>
 
-        {/* Signal Strength */}
-        <div className="mt-auto p-4 bg-[#1b2136] rounded-xl border border-[#323f67] shadow-inner shrink-0">
-          <p className="text-[10px] font-black text-[#919fca] uppercase tracking-widest mb-3">Signal Strength</p>
-          <div className="flex items-end gap-1.5 h-8">
-            {[30, 50, 70, 90, 40].map((h, i) => (
-              <div key={i} className={`w-2 rounded-t-sm transition-all duration-500 ${i === 4 ? 'bg-[#323f67]' : 'bg-[#0f47f0] shadow-[0_0_10px_rgba(15,71,240,0.4)]'}`} style={{ height: `${h}%` }} />
+        <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50 mt-auto">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Signal Integrity</span>
+            <span className="text-[10px] font-mono text-blue-400">0.02ms</span>
+          </div>
+          <div className="flex items-end gap-1 h-5">
+            {[30, 60, 45, 90, 75, 40, 80, 50, 95, 65].map((h, i) => (
+              <div key={i} className="flex-1 bg-blue-600/40 rounded-t-[1px]" style={{ height: `${h}%` }} />
             ))}
           </div>
-          <p className="text-[10px] text-[#0f47f0] font-black mt-3 flex items-center gap-2">
-            <Wifi size={12} /> ENCRYPTED L-BAND 80%
-          </p>
         </div>
       </aside>
 

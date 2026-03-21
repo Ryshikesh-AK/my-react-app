@@ -4,6 +4,8 @@ import {
   Heart, Droplets, Shield
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { db } from "../Firebase";
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 const HealthAnalyticsDetail = () => {
   const navigate = useNavigate();
@@ -17,11 +19,7 @@ const HealthAnalyticsDetail = () => {
   // Safety check handled by Layout mostly, but kept for robustness
   if (!soldier) return null;
 
-  const [data, setBiometricData] = useState([
-    { time: '20:40', bpm: 72, spo2: 98 },
-    { time: '20:41', bpm: 75, spo2: 97 },
-    { time: '20:42', bpm: 72, spo2: 98 }
-  ]);
+  const [data, setBiometricData] = useState([]);
 
   const currentBpm = data[data.length - 1]?.bpm || 72;
   const currentSpo2 = data[data.length - 1]?.spo2 || 98;
@@ -29,20 +27,23 @@ const HealthAnalyticsDetail = () => {
   const isSpo2Alert = currentSpo2 <= MIN_SPO2_LIMIT;
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-      setBiometricData(prev => {
-        const newData = [...prev, {
-          time: timeStr,
-          bpm: Math.floor(Math.random() * (110 - 65 + 1)) + 65,
-          spo2: Math.floor(Math.random() * (100 - 89 + 1)) + 89
-        }];
-        return newData.slice(-50);
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!soldier?.id) return;
+
+    const healthHistoryRef = collection(db, "soldiers", soldier.id, "healthHistory");
+    const q = query(healthHistoryRef, orderBy("timestamp", "desc"), limit(50));
+
+    const unsub = onSnapshot(q, (querySnapshot) => {
+      const historyData = querySnapshot.docs.map(doc => doc.data()).reverse(); // reverse to get chronological order
+      const chartData = historyData.map(item => ({
+        time: new Date(item.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+        bpm: item.bpm,
+        spo2: item.spo2
+      }));
+      setBiometricData(chartData);
+    });
+
+    return () => unsub();
+  }, [soldier?.id]);
 
   return (
     <div className={`flex flex-col h-full bg-[#101422] text-slate-200 font-sans overflow-hidden`}>
