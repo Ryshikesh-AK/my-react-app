@@ -88,8 +88,19 @@ const WatchFace = () => {
   const sendAckToHQ = async () => {
     if (!soldierId || !operativeData?.lastMessageFromHQ) return;
     try {
+      const messagesRef = collection(db, "soldiers", soldierId, "messages");
+      const ackText = `ACK: ${operativeData.lastMessageFromHQ}`;
+
+      // 1. Add to persistent message history
+      await addDoc(messagesRef, {
+        sender: 'soldier',
+        text: ackText,
+        timestamp: serverTimestamp()
+      });
+
+      // 2. Clear from HQ trigger (compatible with existing logic)
       await updateDoc(doc(db, "soldiers", soldierId), {
-        lastMessageFromSoldier: `ACK: ${operativeData.lastMessageFromHQ}`,
+        lastMessageFromSoldier: ackText,
         soldierMessageTime: serverTimestamp(),
         lastMessageFromHQ: "" 
       });

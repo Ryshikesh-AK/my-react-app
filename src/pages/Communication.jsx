@@ -3,7 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useMission } from '../context/MissionContext';
 // 🛰️ FIREBASE IMPORTS
 import { db } from '../Firebase'; 
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, limit } from 'firebase/firestore';
 
 import {
   Search, Bell, Settings, CircleAlert,
@@ -42,30 +42,25 @@ const CommunicationHub = ({ embedded = false }) => {
   const soldier = soldiers?.find(s => s.id === soldierFromContext?.id) || soldierFromContext;
   const chatEndRef = useRef(null);
 
-  // --- 🛰️ FIREBASE REAL-TIME LISTENER ---
+  // --- 🛰️ FIREBASE REAL-TIME LISTENER (PERSISTENT HISTORY) ---
   useEffect(() => {
     if (!soldier?.id) return;
 
-    const unsub = onSnapshot(doc(db, "soldiers", soldier.id), (docSnapshot) => {
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data();
-        
-        // If the soldier sends an ACK, add it to the chat stream
-        if (data.lastMessageFromSoldier) {
-          const incomingMsg = {
-            id: Date.now(),
-            sender: 'soldier',
-            text: data.lastMessageFromSoldier,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-          
-          setMessages(prev => {
-            // Prevent duplicate entries of the same ACK
-            if (prev.length > 0 && prev[prev.length - 1].text === data.lastMessageFromSoldier) return prev;
-            return [...prev, incomingMsg];
-          });
-        }
-      }
+    // Listen to the 'messages' sub-collection for this specific soldier
+    const messagesRef = collection(db, "soldiers", soldier.id, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+    const unsub = onSnapshot(q, (querySnapshot) => {
+      const fetchedMessages = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          sender: data.sender, // 'admin' or 'soldier'
+          text: data.text,
+          time: data.timestamp?.toDate ? data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'
+        };
+      });
+      setMessages(fetchedMessages);
     });
 
     return () => unsub();
@@ -75,7 +70,7 @@ const CommunicationHub = ({ embedded = false }) => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // --- 📤 SEND COMMAND TO FIREBASE ---
+  // --- 📤 SEND COMMAND TO FIREBASE SUB-COLLECTION ---
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim() || !soldier?.id) return;
@@ -84,18 +79,22 @@ const CommunicationHub = ({ embedded = false }) => {
     setInput('');
 
     try {
+      const messagesRef = collection(db, "soldiers", soldier.id, "messages");
+      
+      // 1. Add to persistent message history
+      await addDoc(messagesRef, {
+        sender: 'admin',
+        text: commandText,
+        timestamp: serverTimestamp()
+      });
+
+      // 2. Also update the main document for 'latest message' triggers (compatible with Watch logic)
       await updateDoc(doc(db, "soldiers", soldier.id), {
         lastMessageFromHQ: commandText,
         hqMessageTime: serverTimestamp(),
-        lastMessageFromSoldier: "" // Clear previous ACK to prepare for new one
+        lastMessageFromSoldier: "" // Clear previous response
       });
 
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        sender: 'admin',
-        text: commandText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
     } catch (error) {
       console.error("Transmission Error:", error);
     }
