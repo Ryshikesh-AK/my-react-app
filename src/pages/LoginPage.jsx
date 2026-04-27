@@ -84,7 +84,7 @@ export default function LoginPage() {
           <h2 className="text-4xl font-bold text-center">
             {isSoldierMode ? "Operative Uplink" : "Secure Mission Control"}
           </h2>
-          <h2 className="text-4xl font-bold text-center mb-3">Login</h2>
+          <h2 className="text-4xl font-bold text-center mb-3"> sign in</h2>
           <p className="text-text-secondary text-sm text-center uppercase tracking-widest">
             {isSoldierMode ? "Classified Service ID Required" : "Strategic Surveillance & Monitoring"}
           </p>
