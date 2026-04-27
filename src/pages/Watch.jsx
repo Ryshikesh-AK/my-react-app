@@ -127,13 +127,13 @@ const WatchFace = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#0a0c10] font-mono select-none">
       {/* Outer Glow updates based on Alert state */}
-      <div className={`relative w-[500px] h-[500px] rounded-full bg-[#12161d] border-[12px] transition-all duration-500 flex items-center justify-center
+      <div className={`relative w-[95vw] max-w-[500px] aspect-square rounded-full bg-[#12161d] border-[8px] md:border-[12px] transition-all duration-500 flex items-center justify-center
         ${isGlobalAlert ? 'border-rose-600 shadow-[0_0_60px_rgba(225,29,72,0.4)]' : 'border-[#1b222c] shadow-[0_0_50px_rgba(0,0,0,0.8)]'}`}>
         
-        <div className="absolute inset-0 rounded-full border border-white/5 m-10" />
-        <div className="absolute inset-0 rounded-full border border-white/5 m-20" />
+        <div className="absolute inset-0 rounded-full border border-white/5 m-6 md:m-10" />
+        <div className="absolute inset-0 rounded-full border border-white/5 m-12 md:m-20" />
         
-        <div className="relative z-10 flex flex-col items-center w-full px-12 text-center">
+        <div className="relative z-10 flex flex-col items-center w-full px-6 md:px-12 text-center">
           
           {/* Top Status Indicators */}
           <div className="flex flex-col items-center gap-1 mb-6">
@@ -151,7 +151,7 @@ const WatchFace = () => {
               {operativeData.name || "UNNAMED OPERATIVE"}
             </p>
             
-            <h1 className="text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] tabular-nums">
+            <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] tabular-nums">
               {formatTime(time)}
             </h1>
             
